@@ -1,7 +1,3 @@
-interface Item {
-    message: string;
-}
-
 type KeyedArray<T> = { key: string, value: T }[];
 
 type Transform<T> = (state: T) => T;
@@ -13,7 +9,7 @@ interface Pipeline<T> {
 describe('pipeline', () => {
     it('should build an array', () => {
         // Define a state reducer.
-        const [ getState, setState ] = simulateState<KeyedArray<Item>>([]);
+        const [ getState, setState ] = simulateState<KeyedArray<{ message: string }>>([]);
 
         // Set up a pipeline.
         const pipeline = createPipeline(setState);
