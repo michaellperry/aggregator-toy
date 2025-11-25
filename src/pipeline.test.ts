@@ -13,10 +13,7 @@ interface Pipeline<T> {
 describe('pipeline', () => {
     it('should build an array', () => {
         // Define a state reducer.
-        let state: KeyedArray<Item> = [];
-        const setState = (transform: Transform<KeyedArray<Item>>) => {
-            state = transform(state);
-        }
+        const [ getState, setState ] = simulateState<KeyedArray<Item>>([]);
 
         // Set up a pipeline.
         const pipeline = createPipeline(setState);
@@ -26,7 +23,7 @@ describe('pipeline', () => {
         pipeline.onAdded("item2", { message: "Goodbye" });
 
         // Observe the output of the pipeline.
-        const output = produce(state);
+        const output = produce(getState());
 
         expect(output).toEqual([
             { message: "Hello" },
@@ -34,6 +31,14 @@ describe('pipeline', () => {
         ]);
     });
 });
+
+function simulateState<T>(initialState: T): [() => T, (transform: Transform<T>) => void] {
+    let state: T = initialState;
+    return [
+        () => state,
+        (transform: Transform<T>) => state = transform(state)
+    ];
+}
 
 function createPipeline<T>(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<T> {
     return {
