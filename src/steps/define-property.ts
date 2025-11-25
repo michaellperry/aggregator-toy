@@ -1,10 +1,15 @@
 import type { Step } from '../pipeline';
+import { getPathsFromDescriptor, type TypeDescriptor } from '../pipeline';
 
 export class DefinePropertyStep<T, K extends string, U> implements Step<T & Record<K, U>> {
     constructor(private input: Step<T>, private propertyName: K, private compute: (item: T) => U) {}
     
+    getTypeDescriptor(): TypeDescriptor {
+        return this.input.getTypeDescriptor();
+    }
+
     getPaths(): string[][] {
-        return this.input.getPaths();
+        return getPathsFromDescriptor(this.getTypeDescriptor());
     }
     
     onAdded(path: string[], handler: (path: string[], key: string, immutableProps: T & Record<K, U>) => void): void {

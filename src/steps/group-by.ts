@@ -2,6 +2,7 @@ import type { Step } from '../pipeline';
 import { computeKeyHash } from '../util/hash';
 import { createCompositeKey, parseCompositeKey } from '../util/composite-key';
 import { KeyedArray } from "../builder";
+import { getPathsFromDescriptor, type TypeDescriptor } from '../pipeline';
 
 export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step<Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>> {
     private groups: Map<string, { groupKey: string, keyProps: Pick<T, K>, items: Map<string, Omit<T, K>> }> = new Map();
@@ -15,8 +16,21 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         private arrayName: ArrayName
     ) {}
 
+    getTypeDescriptor(): TypeDescriptor {
+        const inputDescriptor = this.input.getTypeDescriptor();
+        return {
+            arrays: [
+                ...inputDescriptor.arrays,
+                {
+                    name: this.arrayName,
+                    type: inputDescriptor  // Items have the input type
+                }
+            ]
+        };
+    }
+
     getPaths(): string[][] {
-        return [[], [this.arrayName]];
+        return getPathsFromDescriptor(this.getTypeDescriptor());
     }
 
     onAdded(path: string[], handler: (path: string[], key: string, immutableProps: Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>) => void): void {

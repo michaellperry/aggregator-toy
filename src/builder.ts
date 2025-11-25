@@ -1,4 +1,4 @@
-import type { Pipeline, Step } from './pipeline';
+import type { Pipeline, Step, TypeDescriptor } from './pipeline';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
@@ -28,6 +28,10 @@ export class PipelineBuilder<TStart, T extends {}> {
         validateArrayName(arrayName);
         const newStep = new GroupByStep(this.lastStep, keyProperties, arrayName);
         return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>>(this.input, newStep);
+    }
+
+    getTypeDescriptor(): TypeDescriptor {
+        return this.lastStep.getTypeDescriptor();
     }
 
     build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {

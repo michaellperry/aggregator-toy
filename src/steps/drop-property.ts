@@ -1,10 +1,15 @@
 import type { Step } from '../pipeline';
+import { getPathsFromDescriptor, type TypeDescriptor } from '../pipeline';
 
 export class DropPropertyStep<T, K extends keyof T> implements Step<Omit<T, K>> {
     constructor(private input: Step<T>, private propertyName: K) {}
     
+    getTypeDescriptor(): TypeDescriptor {
+        return this.input.getTypeDescriptor();
+    }
+
     getPaths(): string[][] {
-        return this.input.getPaths();
+        return getPathsFromDescriptor(this.getTypeDescriptor());
     }
     
     onAdded(path: string[], handler: (path: string[], key: string, immutableProps: Omit<T, K>) => void): void {

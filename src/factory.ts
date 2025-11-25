@@ -1,13 +1,18 @@
 import type { Pipeline, Step } from './pipeline';
 import { PipelineBuilder } from './builder';
+import { getPathsFromDescriptor, type TypeDescriptor } from './pipeline';
 
 // Private class (not exported)
 class InputPipeline<T> implements Pipeline<T>, Step<T> {
     private handlers: Map<string, ((path: string[], key: string, immutableProps: T) => void)[]> = new Map();
     private removalHandlers: Map<string, ((path: string[], key: string) => void)[]> = new Map();
 
+    getTypeDescriptor(): TypeDescriptor {
+        return { arrays: [] }; // No arrays at input level
+    }
+
     getPaths(): string[][] {
-        return [[]]; // Only emits top-level items with empty path
+        return getPathsFromDescriptor(this.getTypeDescriptor());
     }
 
     add(key: string, immutableProps: T): void {
