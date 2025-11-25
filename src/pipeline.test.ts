@@ -2,19 +2,19 @@ interface Item {
     message: string;
 }
 
-type State = { key: string, value: Item }[];
+type KeyedArray<T> = { key: string, value: T }[];
 
 type Transform<T> = (state: T) => T;
 
-interface Pipeline {
-    onAdded(key: string, immutableProps: Item): void;
+interface Pipeline<T> {
+    onAdded(key: string, immutableProps: T): void;
 }
 
 describe('pipeline', () => {
     it('should build an array', () => {
         // Define a state reducer.
-        let state: State = [];
-        const setState = (transform: Transform<State>) => {
+        let state: KeyedArray<Item> = [];
+        const setState = (transform: Transform<KeyedArray<Item>>) => {
             state = transform(state);
         }
 
@@ -35,7 +35,7 @@ describe('pipeline', () => {
     });
 });
 
-function createPipeline(setState: (transform: Transform<State>) => void): Pipeline {
+function createPipeline<T>(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<T> {
     return {
         onAdded(key, immutableProps) {
             setState(state => [...state, { key, value: immutableProps }]);
@@ -43,6 +43,6 @@ function createPipeline(setState: (transform: Transform<State>) => void): Pipeli
     };
 }
 
-function produce(state: State) : Item[] {
+function produce<T>(state: KeyedArray<T>) : T[] {
     return state.map(item => item.value);
 }
