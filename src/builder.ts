@@ -2,6 +2,7 @@ import type { Pipeline, Step } from './pipeline';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
+import { validateArrayName } from './util/validation';
 
 // Public types (exported for use in build() signature)
 export type KeyedArray<T> = { key: string, value: T }[];
@@ -24,28 +25,36 @@ export class PipelineBuilder<TStart, T extends {}> {
         keyProperties: K[],
         arrayName: ArrayName
     ): PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, Omit<T, K>[]>> {
+        validateArrayName(arrayName);
         const newStep = new GroupByStep(this.lastStep, keyProperties, arrayName);
         return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, Omit<T, K>[]>>(this.input, newStep);
     }
 
     build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {
-        this.lastStep.onAdded((path, key, immutableProps) => {
-            setState(state => {
-                const existingIndex = state.findIndex(item => item.key === key);
-                if (existingIndex >= 0) {
-                    // Update existing item
-                    const updated = [...state];
-                    updated[existingIndex] = { key, value: immutableProps };
-                    return updated;
-                } else {
-                    // Add new item
-                    return [...state, { key, value: immutableProps }];
-                }
+        const paths = this.lastStep.getPaths();
+        
+        // Register handlers for each path the step will emit
+        paths.forEach(path => {
+            this.lastStep.onAdded(path, (path, key, immutableProps) => {
+                setState(state => {
+                    const existingIndex = state.findIndex(item => item.key === key);
+                    if (existingIndex >= 0) {
+                        // Update existing item
+                        const updated = [...state];
+                        updated[existingIndex] = { key, value: immutableProps };
+                        return updated;
+                    } else {
+                        // Add new item
+                        return [...state, { key, value: immutableProps }];
+                    }
+                });
+            });
+            
+            this.lastStep.onRemoved(path, (path, key) => {
+                setState(state => state.filter(item => item.key !== key));
             });
         });
-        this.lastStep.onRemoved((path, key) => {
-            setState(state => state.filter(item => item.key !== key));
-        });
+        
         return this.input;
     }
 }

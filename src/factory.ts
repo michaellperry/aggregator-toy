@@ -3,23 +3,37 @@ import { PipelineBuilder } from './builder';
 
 // Private class (not exported)
 class InputPipeline<T> implements Pipeline<T>, Step<T> {
-    private handlers: ((path: string[], key: string, immutableProps: T) => void)[] = [];
-    private removalHandlers: ((path: string[], key: string) => void)[] = [];
+    private handlers: Map<string, ((path: string[], key: string, immutableProps: T) => void)[]> = new Map();
+    private removalHandlers: Map<string, ((path: string[], key: string) => void)[]> = new Map();
+
+    getPaths(): string[][] {
+        return [[]]; // Only emits top-level items with empty path
+    }
 
     add(key: string, immutableProps: T): void {
-        this.handlers.forEach(handler => handler([], key, immutableProps));
+        const pathKey = [].join(':');
+        const handlersForPath = this.handlers.get(pathKey) || [];
+        handlersForPath.forEach(handler => handler([], key, immutableProps));
     }
 
     remove(key: string): void {
-        this.removalHandlers.forEach(handler => handler([], key));
+        const pathKey = [].join(':');
+        const handlersForPath = this.removalHandlers.get(pathKey) || [];
+        handlersForPath.forEach(handler => handler([], key));
     }
 
-    onAdded(handler: (path: string[], key: string, immutableProps: T) => void): void {
-        this.handlers.push(handler);
+    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: T) => void): void {
+        const pathKey = path.join(':');
+        const handlersForPath = this.handlers.get(pathKey) || [];
+        handlersForPath.push(handler);
+        this.handlers.set(pathKey, handlersForPath);
     }
 
-    onRemoved(handler: (path: string[], key: string) => void): void {
-        this.removalHandlers.push(handler);
+    onRemoved(path: string[], handler: (path: string[], key: string) => void): void {
+        const pathKey = path.join(':');
+        const handlersForPath = this.removalHandlers.get(pathKey) || [];
+        handlersForPath.push(handler);
+        this.removalHandlers.set(pathKey, handlersForPath);
     }
 }
 

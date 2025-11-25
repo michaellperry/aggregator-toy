@@ -1,0 +1,96 @@
+import { createPipeline } from '../index';
+import { createTestPipeline } from './helpers';
+
+describe('pipeline integration tests', () => {
+    it('should handle composite keys with defineProperty step on groups', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number }>()
+                .groupBy(['category'], 'items')
+                .defineProperty('groupLabel' as any, (group: any) => {
+                    // This will be called for both groups and items
+                    // Groups have category, items don't
+                    return group.category ? `Group: ${group.category}` : 'Item';
+                })
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10 });
+        pipeline.add("item2", { category: 'A', value: 20 });
+
+        const output = getOutput() as any[];
+        expect(output.length).toBe(1);
+        expect(output[0].category).toBe('A');
+        expect(output[0].groupLabel).toBe('Group: A');
+        // Items also get the property, but with 'Item' value since they don't have category
+        expect(output[0].items).toEqual([
+            { value: 10, groupLabel: 'Item' },
+            { value: 20, groupLabel: 'Item' }
+        ]);
+    });
+
+    it('should handle composite keys with dropProperty step', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number, extra: string }>()
+                .groupBy(['category'], 'items')
+                .dropProperty('extra' as any)
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10, extra: 'x' });
+        pipeline.add("item2", { category: 'A', value: 20, extra: 'y' });
+
+        const output = getOutput() as any[];
+        expect(output.length).toBe(1);
+        expect(output[0].category).toBe('A');
+        expect(output[0].items).toEqual([
+            { value: 10 },
+            { value: 20 }
+        ]);
+    });
+
+    it('should maintain separate state for groups and items with composite keys', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number }>()
+                .groupBy(['category'], 'items')
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10 });
+        pipeline.add("item2", { category: 'B', value: 20 });
+        pipeline.add("item3", { category: 'A', value: 30 });
+
+        const output = getOutput();
+        // Should have 2 groups
+        expect(output.length).toBe(2);
+        
+        const groupA = output.find(g => g.category === 'A');
+        const groupB = output.find(g => g.category === 'B');
+        
+        expect(groupA).toBeDefined();
+        expect(groupA?.items).toEqual([{ value: 10 }, { value: 30 }]);
+        
+        expect(groupB).toBeDefined();
+        expect(groupB?.items).toEqual([{ value: 20 }]);
+    });
+
+    it('should correctly remove items using composite keys', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number }>()
+                .groupBy(['category'], 'items')
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10 });
+        pipeline.add("item2", { category: 'A', value: 20 });
+        pipeline.add("item3", { category: 'A', value: 30 });
+
+        expect(getOutput()[0].items.length).toBe(3);
+
+        // Remove using original item key
+        pipeline.remove("item2");
+
+        const output = getOutput();
+        expect(output.length).toBe(1);
+        expect(output[0].items).toEqual([
+            { value: 10 },
+            { value: 30 }
+        ]);
+    });
+});
+
