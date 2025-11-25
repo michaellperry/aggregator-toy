@@ -2,17 +2,33 @@ import { KeyedArray, Transform, PipelineBuilder, Pipeline } from '../index';
 import { parseCompositeKey } from '../util/composite-key';
 
 // Type helper to extract the output type from a PipelineBuilder
-export type BuilderOutputType<T> = T extends PipelineBuilder<any, infer U> ? U : never;
+// and recursively convert KeyedArray properties to arrays
+type ExtractKeyedArrays<T> = T extends KeyedArray<infer U>
+    ? ExtractKeyedArrays<U>[]  // Convert KeyedArray<T> to T[]
+    : T extends object
+    ? {
+          // For intersection types, we need to be more careful about which keys to include
+          [K in keyof T]: T[K] extends KeyedArray<infer U>
+              ? ExtractKeyedArrays<U>[]
+              : ExtractKeyedArrays<T[K]>
+      }
+    : T;
+
+export type BuilderOutputType<T> = T extends PipelineBuilder<any, infer U> 
+    ? ExtractKeyedArrays<U> 
+    : never;
 
 // Helper function that uses type inference to set up a test pipeline
-export function createTestPipeline<TStart, T extends {}>(
-    builderFactory: () => PipelineBuilder<TStart, T>
-): [Pipeline<TStart>, () => T[]] {
+export function createTestPipeline<TBuilder extends PipelineBuilder<any, any>>(
+    builderFactory: () => TBuilder
+): [Pipeline<any>, () => BuilderOutputType<TBuilder>[]] {
     const builder = builderFactory();
-    type OutputType = BuilderOutputType<typeof builder>;
+    type OutputType = BuilderOutputType<TBuilder>;
+    // Use the actual output type from the builder, not the input type
     const [ getState, setState ] = simulateState<KeyedArray<OutputType>>([]);
     const pipeline = builder.build(setState);
-    return [pipeline, () => produce(getState())];
+    const getOutput = (): OutputType[] => produce<OutputType>(getState());
+    return [pipeline, getOutput];
 }
 
 export function simulateState<T>(initialState: T): [() => T, (transform: Transform<T>) => void] {
@@ -44,27 +60,46 @@ export function produce<T>(state: KeyedArray<T>) : T[] {
         }
     });
     
-    // Reconstruct groups with their items
-    return groups.map(group => {
+    // Find which groups are referenced as items in arrays (nested groups)
+    const nestedGroupKeys = new Set(items.map(item => item.itemKey));
+    
+    // Helper function to recursively process a group and its nested arrays
+    const processGroup = (group: { key: string, value: T }): T => {
         const groupValue = group.value as any;
-        // Find all items for this group
-        const groupItems = items
-            .filter(item => item.groupKey === group.key)
-            .map(item => item.value);
-        
-        // If the group value has array properties, reconstruct them
         const reconstructed = { ...groupValue };
+        
+        // Find all array properties for this group
         const arrayNames = new Set(items
             .filter(item => item.groupKey === group.key)
             .map(item => item.arrayName));
         
         arrayNames.forEach(arrayName => {
-            reconstructed[arrayName] = items
-                .filter(item => item.groupKey === group.key && item.arrayName === arrayName)
-                .map(item => item.value);
+            // Get all items for this array property
+            const arrayItemEntries = items
+                .filter(item => item.groupKey === group.key && item.arrayName === arrayName);
+            
+            // For each item, check if it's a nested group that needs recursive processing
+            const arrayItems = arrayItemEntries.map(entry => {
+                // Check if this item key corresponds to a group (nested structure)
+                const nestedGroup = groups.find(g => g.key === entry.itemKey);
+                if (nestedGroup) {
+                    // This is a nested group - recursively process it
+                    return processGroup(nestedGroup);
+                } else {
+                    // This is a simple item
+                    return entry.value;
+                }
+            });
+            
+            reconstructed[arrayName] = arrayItems;
         });
         
         return reconstructed as T;
-    });
+    };
+    
+    // Only process top-level groups (groups that are not referenced as items in arrays)
+    return groups
+        .filter(group => !nestedGroupKeys.has(group.key))
+        .map(group => processGroup(group));
 }
 

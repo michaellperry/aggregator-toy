@@ -4,7 +4,8 @@
   "description": "Playground for building a composable aggregator",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "test:types": "tsd --files \"src/test/**/*.test-d.ts\""
   },
   "author": "Michael L Perry",
   "license": "MIT",
@@ -12,6 +13,7 @@
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.5",
+    "tsd": "^0.33.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {

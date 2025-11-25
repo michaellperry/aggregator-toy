@@ -1,8 +1,9 @@
 import type { Step } from '../pipeline';
 import { computeKeyHash } from '../util/hash';
 import { createCompositeKey, parseCompositeKey } from '../util/composite-key';
+import { KeyedArray } from "../builder";
 
-export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step<Pick<T, K> & Record<ArrayName, Omit<T, K>[]>> {
+export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step<Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>> {
     private groups: Map<string, { groupKey: string, keyProps: Pick<T, K>, items: Map<string, Omit<T, K>> }> = new Map();
     private itemToGroup: Map<string, string> = new Map();
     private addedHandlers: Map<string, (path: string[], key: string, immutableProps: any) => void> = new Map();
@@ -18,7 +19,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         return [[], [this.arrayName]];
     }
 
-    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: Pick<T, K> & Record<ArrayName, Omit<T, K>[]>) => void): void {
+    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>) => void): void {
         const pathKey = path.join(':');
         this.addedHandlers.set(pathKey, handler);
         

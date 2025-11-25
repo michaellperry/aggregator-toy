@@ -24,10 +24,10 @@ export class PipelineBuilder<TStart, T extends {}> {
     groupBy<K extends keyof T, ArrayName extends string>(
         keyProperties: K[],
         arrayName: ArrayName
-    ): PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, Omit<T, K>[]>> {
+    ): PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>> {
         validateArrayName(arrayName);
         const newStep = new GroupByStep(this.lastStep, keyProperties, arrayName);
-        return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, Omit<T, K>[]>>(this.input, newStep);
+        return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>>(this.input, newStep);
     }
 
     build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {
