@@ -1,50 +1,4 @@
-type KeyedArray<T> = { key: string, value: T }[];
-
-type Transform<T> = (state: T) => T;
-
-interface Pipeline<T> {
-    add(key: string, immutableProps: T): void;
-}
-
-interface Step<T> {
-    onAdded(handler: (key: string, immutableProps: T) => void): void;
-}
-
-class DefinePropertyStep<T, K extends string, U> implements Step<T & Record<K, U>> {
-    constructor(private input: Step<T>, private propertyName: K, private compute: (item: T) => U) {}
-    onAdded(handler: (key: string, immutableProps: T & Record<K, U>) => void): void {
-        this.input.onAdded((key, immutableProps) => {
-            handler(key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps) } as T & Record<K, U>);
-        });
-    }
-}
-
-class PipelineBuilder<TStart, T> {
-    constructor(private input: Pipeline<TStart>,private lastStep: Step<T>) {}
-
-    defineProperty<K extends string, U>(propertyName: K, compute: (item: T) => U): PipelineBuilder<TStart, T & Record<K, U>> {
-        const newStep = new DefinePropertyStep(this.lastStep, propertyName, compute);
-        return new PipelineBuilder<TStart, T & Record<K, U>>(this.input, newStep);
-    }
-    build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {
-        this.lastStep.onAdded((key, immutableProps) => {
-            setState(state => [...state, { key, value: immutableProps }]);
-        });
-        return this.input;
-    }
-}
-
-class InputPipeline<T> implements Pipeline<T>, Step<T> {
-    private handlers: ((key: string, immutableProps: T) => void)[] = [];
-
-    add(key: string, immutableProps: T): void {
-        this.handlers.forEach(handler => handler(key, immutableProps));
-    }
-
-    onAdded(handler: (key: string, immutableProps: T) => void): void {
-        this.handlers.push(handler);
-    }
-}
+import { createPipeline, KeyedArray, Transform } from './index';
 
 describe('pipeline', () => {
     it('should build an array', () => {
@@ -95,10 +49,6 @@ function simulateState<T>(initialState: T): [() => T, (transform: Transform<T>) 
     ];
 }
 
-function createPipeline<TStart>(): PipelineBuilder<TStart, TStart> {
-    const start = new InputPipeline<TStart>();
-    return new PipelineBuilder<TStart, TStart>(start, start);
-}
 
 function produce<T>(state: KeyedArray<T>) : T[] {
     return state.map(item => item.value);
