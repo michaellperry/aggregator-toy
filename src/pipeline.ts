@@ -4,7 +4,7 @@ export interface Pipeline<T> {
 }
 
 export interface Step<T> {
-    onAdded(handler: (key: string, immutableProps: T) => void): void;
-    onRemoved(handler: (key: string) => void): void;
+    onAdded(handler: (path: string[], key: string, immutableProps: T) => void): void;
+    onRemoved(handler: (path: string[], key: string) => void): void;
 }
 
