@@ -7,5 +7,8 @@ export class DefinePropertyStep<T, K extends string, U> implements Step<T & Reco
             handler(key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps) } as T & Record<K, U>);
         });
     }
+    onRemoved(handler: (key: string) => void): void {
+        this.input.onRemoved(handler);
+    }
 }
 

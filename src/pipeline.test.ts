@@ -47,6 +47,53 @@ describe('pipeline', () => {
             { a: 4, b: -1, sum: 3 }
         ]);
     });
+
+    it('should remove an item', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ message: string }>()
+        );
+
+        pipeline.add("item1", { message: "Hello" });
+        pipeline.add("item2", { message: "Goodbye" });
+        pipeline.add("item3", { message: "See you" });
+
+        expect(getOutput()).toEqual([
+            { message: "Hello" },
+            { message: "Goodbye" },
+            { message: "See you" }
+        ]);
+
+        pipeline.remove("item2");
+
+        expect(getOutput()).toEqual([
+            { message: "Hello" },
+            { message: "See you" }
+        ]);
+    });
+
+    it('should remove an item with computed properties', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ a: number, b: number }>()
+                .defineProperty("sum", (item) => item.a + item.b)
+        );
+
+        pipeline.add("item1", { a: 2, b: 5 });
+        pipeline.add("item2", { a: 4, b: -1 });
+        pipeline.add("item3", { a: 10, b: 20 });
+
+        expect(getOutput()).toEqual([
+            { a: 2, b: 5, sum: 7 },
+            { a: 4, b: -1, sum: 3 },
+            { a: 10, b: 20, sum: 30 }
+        ]);
+
+        pipeline.remove("item2");
+
+        expect(getOutput()).toEqual([
+            { a: 2, b: 5, sum: 7 },
+            { a: 10, b: 20, sum: 30 }
+        ]);
+    });
 });
 
 function simulateState<T>(initialState: T): [() => T, (transform: Transform<T>) => void] {

@@ -17,6 +17,9 @@ export class PipelineBuilder<TStart, T> {
         this.lastStep.onAdded((key, immutableProps) => {
             setState(state => [...state, { key, value: immutableProps }]);
         });
+        this.lastStep.onRemoved((key) => {
+            setState(state => state.filter(item => item.key !== key));
+        });
         return this.input;
     }
 }
