@@ -1,5 +1,6 @@
 import type { Pipeline, Step } from './pipeline';
 import { DefinePropertyStep } from './steps/define-property';
+import { DropPropertyStep } from './steps/drop-property';
 
 // Public types (exported for use in build() signature)
 export type KeyedArray<T> = { key: string, value: T }[];
@@ -11,6 +12,11 @@ export class PipelineBuilder<TStart, T> {
     defineProperty<K extends string, U>(propertyName: K, compute: (item: T) => U): PipelineBuilder<TStart, T & Record<K, U>> {
         const newStep = new DefinePropertyStep(this.lastStep, propertyName, compute);
         return new PipelineBuilder<TStart, T & Record<K, U>>(this.input, newStep);
+    }
+
+    dropProperty<K extends keyof T>(propertyName: K): PipelineBuilder<TStart, Omit<T, K>> {
+        const newStep = new DropPropertyStep(this.lastStep, propertyName);
+        return new PipelineBuilder<TStart, Omit<T, K>>(this.input, newStep);
     }
 
     build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {
