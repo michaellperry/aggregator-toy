@@ -59,6 +59,10 @@ export class PipelineBuilder<TStart, T extends {}> {
             this.lastStep.onRemoved(pathName, (path, key) => {
                 setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
             });
+            
+            this.lastStep.onModified(pathName, (path, key, name, value) => {
+                setState(state => modifyInKeyedArray(state, pathName, path, key, name, value) as KeyedArray<T>);
+            });
         });
         
         return this.input;
@@ -120,6 +124,57 @@ function removeFromKeyedArray(state: KeyedArray<any>, pathName: string[], path: 
         const existingItem = state[existingItemIndex];
         const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
         const modifiedArray = removeFromKeyedArray(existingArray, pathName.slice(1), path.slice(1), key);
+        const modifiedItem = {
+            key: parentKey,
+            value: {
+                ...existingItem.value,
+                [pathName[0]]: modifiedArray
+            }
+        };
+        return [
+            ...state.slice(0, existingItemIndex),
+            modifiedItem,
+            ...state.slice(existingItemIndex+1)
+        ];
+    }
+}
+
+function modifyInKeyedArray(state: KeyedArray<any>, pathName: string[], path: string[], key: string, name: string, value: any): KeyedArray<any> {
+    if (pathName.length === 0) {
+        if (path.length !== 0) {
+            throw new Error("Mismatched path length when modifying state");
+        }
+        const existingItemIndex = state.findIndex(item => item.key === key);
+        if (existingItemIndex < 0) {
+            throw new Error("Path references unknown item when modifying state");
+        }
+        const existingItem = state[existingItemIndex];
+        const modifiedItem = {
+            key: key,
+            value: {
+                ...existingItem.value,
+                [name]: value
+            }
+        };
+        return [
+            ...state.slice(0, existingItemIndex),
+            modifiedItem,
+            ...state.slice(existingItemIndex+1)
+        ];
+    }
+    else {
+        if (path.length === 0) {
+            throw new Error("Mismatched path length when modifying state");
+        }
+        const parentKey = path[0];
+        const arrayName = pathName[0];
+        const existingItemIndex = state.findIndex(item => item.key === parentKey);
+        if (existingItemIndex < 0) {
+            throw new Error("Path references unknown item when modifying state");
+        }
+        const existingItem = state[existingItemIndex];
+        const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
+        const modifiedArray = modifyInKeyedArray(existingArray, pathName.slice(1), path.slice(1), key, name, value);
         const modifiedItem = {
             key: parentKey,
             value: {
