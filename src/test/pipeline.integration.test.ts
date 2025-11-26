@@ -2,7 +2,7 @@ import { createPipeline } from '../index';
 import { createTestPipeline } from './helpers';
 
 describe('pipeline integration tests', () => {
-    it('should handle composite keys with defineProperty step on groups', () => {
+    it('should handle nested arrays with defineProperty step on groups', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
@@ -27,7 +27,7 @@ describe('pipeline integration tests', () => {
         ]);
     });
 
-    it('should handle composite keys with dropProperty step', () => {
+    it('should handle nested arrays with dropProperty step', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number, extra: string }>()
                 .groupBy(['category'], 'items')
@@ -46,7 +46,7 @@ describe('pipeline integration tests', () => {
         ]);
     });
 
-    it('should maintain separate state for groups and items with composite keys', () => {
+    it('should maintain separate state for groups and items in nested arrays', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
@@ -70,7 +70,7 @@ describe('pipeline integration tests', () => {
         expect(groupB?.items).toEqual([{ value: 20 }]);
     });
 
-    it('should correctly remove items using composite keys', () => {
+    it('should correctly remove items from nested arrays', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')

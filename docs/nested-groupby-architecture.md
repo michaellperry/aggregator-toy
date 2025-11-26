@@ -149,10 +149,10 @@ sequenceDiagram
     Note over GB2: Create group hash TX
     GB2->>State: path=[] key=hash_TX value={state}
     
-    GB1->>GB2: path=[towns] key=composite value={town,pop}
+    GB1->>GB2: path=[towns] key=town1 value={town,pop}
     Note over GB2: SKIPPED - no state property!
     
-    GB2->>State: path=[cities] key=composite value={city}
+    GB2->>State: path=[cities] key=hash_TXDallas value={city}
     Note over State: city has NO towns array!
 ```
 
@@ -173,13 +173,13 @@ sequenceDiagram
     Note over GB1: Buffer town in towns array
     
     GB1->>GB2: path=[] key=hash_TXDallas value={state,city}
-    GB1->>GB2: path=[towns] key=composite value={town,pop}
+    GB1->>GB2: path=[towns] key=town1 value={town,pop}
     
     Note over GB2: Create group hash TX
     Note over GB2: Buffer city with its towns
     
     GB2->>State: path=[] key=hash_TX value={state}
-    GB2->>State: path=[cities] key=composite value={city, towns=[...]}
+    GB2->>State: path=[cities] key=hash_TXDallas value={city, towns=[...]}
     Note over State: city HAS towns array!
 ```
 
@@ -202,7 +202,7 @@ flowchart TB
     subgraph GroupByStep[GroupByStep Enhanced]
         TD[TypeDescriptor Analysis]
         NIB[Nested Item Buffers<br/>Map: arrayName → groupKey → items]
-        GTK[Group-to-OutputKey Mapping<br/>Map: inputGroupKey → outputCompositeKey]
+        GTK[Group-to-OutputKey Mapping<br/>Map: inputGroupKey → outputKey]
         
         subgraph Processing[Event Processing]
             RG[Receive Group from path empty]
@@ -211,7 +211,7 @@ flowchart TB
             RG --> |1. Extract keyProps| CG[Create/Update Output Group]
             RG --> |2. Extract nonKeyProps + nested arrays| EI[Emit to Output Array]
             
-            RI --> |1. Parse composite key| BUF[Buffer Item by Parent Group]
+            RI --> |1. Extract parent from path| BUF[Buffer Item by Parent Group]
             BUF --> |2. If parent already emitted| RE[Re-emit with Updated Arrays]
         end
     end
@@ -237,7 +237,7 @@ class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> {
     private nestedItemBuffers: Map<string, Map<string, any[]>> = new Map();
     
     // NEW: Track which input groups have been emitted to output array
-    // Map: inputGroupKey -> outputCompositeKey
+    // Map: inputGroupKey -> outputKey
     private groupToOutputKey: Map<string, string> = new Map();
 }
 ```
@@ -279,7 +279,7 @@ When emitting to the output array path:
 
 ```typescript
 // Current: Only emits nonKeyProps
-itemHandler([this.arrayName], compositeKey, nonKeyProps);
+itemHandler([this.arrayName], inputGroupKey, nonKeyProps);
 
 // Modified: Include nested arrays from buffer
 const completeValue = { ...nonKeyProps };
@@ -288,10 +288,10 @@ for (const inputArrayName of this.inputArrayNames) {
     const nestedItems = buffer?.get(inputGroupKey) || [];
     completeValue[inputArrayName] = nestedItems;
 }
-itemHandler([this.arrayName], compositeKey, completeValue);
+itemHandler([this.arrayName], inputGroupKey, completeValue);
 
 // Track for re-emission
-this.groupToOutputKey.set(inputGroupKey, compositeKey);
+this.groupToOutputKey.set(inputGroupKey, inputGroupKey);
 ```
 
 #### 3. Processing Items from Nested Array Paths
@@ -299,15 +299,14 @@ this.groupToOutputKey.set(inputGroupKey, compositeKey);
 When receiving items from path `['inputArrayName']`:
 
 ```typescript
-onAdded(inputPath, (path, compositeKey, itemValue) => {
+onAdded(inputPath, (path, itemKey, itemValue) => {
     if (inputPath.length > 0 && this.inputArrayNames.includes(inputPath[0])) {
         const inputArrayName = inputPath[0];
         
-        // Parse composite key to get parent group key
-        const parsed = parseCompositeKey(compositeKey);
-        if (!parsed) return;
-        
-        const parentGroupKey = parsed.groupKey;
+        // Extract parent group key from the path
+        // Path format: [parentGroupKey, ...nestedPath]
+        // For items in nested arrays, path[0] is the parent group key
+        const parentGroupKey = path[0];
         
         // Buffer the item
         const buffer = this.nestedItemBuffers.get(inputArrayName)!;
@@ -328,7 +327,7 @@ onAdded(inputPath, (path, compositeKey, itemValue) => {
 #### 4. Re-emission on Nested Array Update
 
 ```typescript
-private reEmitWithNestedArrays(inputGroupKey: string, outputCompositeKey: string): void {
+private reEmitWithNestedArrays(inputGroupKey: string, outputKey: string): void {
     const group = this.findGroupByInputKey(inputGroupKey);
     if (!group) return;
     
@@ -341,7 +340,7 @@ private reEmitWithNestedArrays(inputGroupKey: string, outputCompositeKey: string
     const itemHandler = this.addedHandlers.get(this.arrayName);
     if (itemHandler) {
         // Re-emit with same key → Builder will UPDATE existing item
-        itemHandler([this.arrayName], outputCompositeKey, completeValue);
+        itemHandler([this.arrayName], outputKey, completeValue);
     }
 }
 ```
@@ -364,17 +363,18 @@ sequenceDiagram
     Note over GB1: Create group TX_Dallas<br/>Buffer empty for towns
     
     GB1->>GB2: path=[] key=TX_Dallas value={state,city}
-    GB1->>GB2: path=[towns] key=TX_Dallas:towns:town1 value={town,pop}
+    GB1->>GB2: path=[towns] key=town1 value={town,pop}
+    Note over GB2: Path indicates parent: TX_Dallas
     
     Note over GB2: Create group TX<br/>Buffer for cities
     Note over GB2: Receive city TX_Dallas with empty towns
     
     GB2->>State: path=[] key=TX value={state}
-    GB2->>State: path=[cities] key=TX:cities:TX_Dallas value={city, towns=[]}
+    GB2->>State: path=[cities] key=TX_Dallas value={city, towns=[]}
     
-    Note over GB2: Receive town from path towns<br/>Buffer: TX_Dallas → town1<br/>Re-emit city with updated towns
+    Note over GB2: Receive town from path towns<br/>Extract parent TX_Dallas from path<br/>Buffer: TX_Dallas → town1<br/>Re-emit city with updated towns
     
-    GB2->>State: path=[cities] key=TX:cities:TX_Dallas value={city, towns=[town1]}
+    GB2->>State: path=[cities] key=TX_Dallas value={city, towns=[town1]}
     
     Note over State: UPDATE existing city<br/>Now has towns array!
 ```
