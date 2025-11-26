@@ -1,4 +1,4 @@
-import type { ImmutableProps, AddedHandler, RemovedHandler, Step } from '../pipeline';
+import type { AddedHandler, ImmutableProps, RemovedHandler, Step } from '../pipeline';
 import { type TypeDescriptor } from '../pipeline';
 import { computeKeyHash } from "../util/hash";
 
@@ -10,7 +10,6 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
 
     keyToGroupHash: Map<string, string> = new Map<string, string>();
     groupToKeys: Map<string, Set<string>> = new Map<string, Set<string>>();
-    groupToKeyProps: Map<string, ImmutableProps> = new Map<string, ImmutableProps>();
 
     constructor(
         private input: Step,
@@ -116,8 +115,6 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         }
         this.groupToKeys.get(keyHash)!.add(key);
         
-        // Store key properties for the group
-        this.groupToKeyProps.set(keyHash, keyProps);
         // Extract the non-key properties from the object
         let nonKeyProps: ImmutableProps = {};
         Object.keys(immutableProps).forEach(prop => {
@@ -158,7 +155,6 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
                 
                 // Clean up tracking
                 this.groupToKeys.delete(keyHash);
-                this.groupToKeyProps.delete(keyHash);
             }
         }
     }

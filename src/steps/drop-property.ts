@@ -1,5 +1,5 @@
 import type { ImmutableProps, Step } from '../pipeline';
-import { getPathNamesFromDescriptor, type TypeDescriptor } from '../pipeline';
+import { type TypeDescriptor } from '../pipeline';
 
 export class DropPropertyStep<T, K extends keyof T> implements Step {
     constructor(private input: Step, private propertyName: K) {}

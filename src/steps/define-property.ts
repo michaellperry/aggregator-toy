@@ -1,5 +1,5 @@
 import type { ImmutableProps, Step } from '../pipeline';
-import { getPathNamesFromDescriptor, type TypeDescriptor } from '../pipeline';
+import { type TypeDescriptor } from '../pipeline';
 
 export class DefinePropertyStep<T, K extends string, U> implements Step {
     constructor(private input: Step, private propertyName: K, private compute: (item: T) => U) {}
