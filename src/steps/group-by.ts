@@ -1,6 +1,7 @@
 import type { AddedHandler, ImmutableProps, RemovedHandler, Step } from '../pipeline';
 import { type TypeDescriptor } from '../pipeline';
 import { computeKeyHash } from "../util/hash";
+import { pathsMatch, pathStartsWith } from "../util/path";
 
 export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step {
     groupAddedHandlers: AddedHandler[] = [];
@@ -173,10 +174,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
      * Checks if pathNames is at the group level (same as scopePath)
      */
     private isAtGroupLevel(pathNames: string[]): boolean {
-        if (pathNames.length !== this.scopePath.length) {
-            return false;
-        }
-        return pathNames.every((name, i) => name === this.scopePath[i]);
+        return pathsMatch(pathNames, this.scopePath);
     }
     
     /**
@@ -184,10 +182,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
      */
     private isAtItemLevel(pathNames: string[]): boolean {
         const itemPath = [...this.scopePath, this.arrayName];
-        if (pathNames.length !== itemPath.length) {
-            return false;
-        }
-        return pathNames.every((name, i) => name === itemPath[i]);
+        return pathsMatch(pathNames, itemPath);
     }
     
     /**
@@ -195,10 +190,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
      */
     private isBelowItemLevel(pathNames: string[]): boolean {
         const itemPath = [...this.scopePath, this.arrayName];
-        if (pathNames.length <= itemPath.length) {
-            return false;
-        }
-        return itemPath.every((name, i) => name === pathNames[i]);
+        return pathNames.length > itemPath.length && pathStartsWith(pathNames, itemPath);
     }
 
     private handleAdded(path: string[], key: string, immutableProps: ImmutableProps) {

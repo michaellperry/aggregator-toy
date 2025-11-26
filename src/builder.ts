@@ -4,6 +4,7 @@ import { DefinePropertyStep } from './steps/define-property';
 import { DropArrayStep } from './steps/drop-array';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
+import { ScopedDefinePropertyStep } from './steps/scoped-define-property';
 import { NavigateToPath, TransformAtPath } from './types/path';
 
 // Public types (exported for use in build() signature)
@@ -190,49 +191,6 @@ export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends strin
             this.input,
             newStep
         );
-    }
-}
-
-/**
- * A step that applies defineProperty only to items at a specific scope path.
- */
-class ScopedDefinePropertyStep<T, K extends string, U> implements Step {
-    constructor(
-        private input: Step,
-        private propertyName: K,
-        private compute: (item: unknown) => U,
-        private scopePath: string[]
-    ) {}
-    
-    getTypeDescriptor(): TypeDescriptor {
-        return this.input.getTypeDescriptor();
-    }
-    
-    onAdded(pathNames: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
-        if (this.isAtScopePath(pathNames)) {
-            // Apply the property transformation at the scoped level
-            this.input.onAdded(pathNames, (path, key, immutableProps) => {
-                handler(path, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps) });
-            });
-        } else {
-            // Pass through unchanged
-            this.input.onAdded(pathNames, handler);
-        }
-    }
-    
-    onRemoved(pathNames: string[], handler: (path: string[], key: string) => void): void {
-        this.input.onRemoved(pathNames, handler);
-    }
-    
-    onModified(pathNames: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
-        this.input.onModified(pathNames, handler);
-    }
-    
-    private isAtScopePath(pathNames: string[]): boolean {
-        if (pathNames.length !== this.scopePath.length) {
-            return false;
-        }
-        return pathNames.every((name, i) => name === this.scopePath[i]);
     }
 }
 
