@@ -37,16 +37,16 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         };
     }
 
-    onAdded(path: string[], handler: AddedHandler): void {
-        if (path.length === 0) {
+    onAdded(pathNames: string[], handler: AddedHandler): void {
+        if (pathNames.length === 0) {
             // Handler is at the group level
             this.groupAddedHandlers.push(handler);
-        } else if (path.length === 1 && path[0] === this.arrayName) {
+        } else if (pathNames.length === 1 && pathNames[0] === this.arrayName) {
             // Handler is at the item level
             this.itemAddedHandlers.push(handler);
-        } else if (path.length > 1 && path[0] === this.arrayName) {
+        } else if (pathNames.length > 1 && pathNames[0] === this.arrayName) {
             // Handler is below this array in the tree
-            const shiftedPath = path.slice(1);
+            const shiftedPath = pathNames.slice(1);
             
             // Register interceptor with input
             this.input.onAdded(shiftedPath, (notifiedPath, key, immutableProps) => {
@@ -59,20 +59,20 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
                 handler(modifiedPath, key, immutableProps);
             });
         } else {
-            this.input.onAdded(path, handler);
+            this.input.onAdded(pathNames, handler);
         }
     }
 
-    onRemoved(path: string[], handler: RemovedHandler): void {
-        if (path.length === 0) {
+    onRemoved(pathNames: string[], handler: RemovedHandler): void {
+        if (pathNames.length === 0) {
             // Handler is at the group level
             this.groupRemovedHandlers.push(handler);
-        } else if (path.length === 1 && path[0] === this.arrayName) {
+        } else if (pathNames.length === 1 && pathNames[0] === this.arrayName) {
             // Handler is at the item level
             this.itemRemovedHandlers.push(handler);
-        } else if (path.length > 1 && path[0] === this.arrayName) {
+        } else if (pathNames.length > 1 && pathNames[0] === this.arrayName) {
             // Handler is below this array in the tree
-            const shiftedPath = path.slice(1);
+            const shiftedPath = pathNames.slice(1);
             
             // Register interceptor with input
             this.input.onRemoved(shiftedPath, (notifiedPath, key) => {
@@ -85,16 +85,16 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
                 handler(modifiedPath, key);
             });
         } else {
-            this.input.onRemoved(path, handler);
+            this.input.onRemoved(pathNames, handler);
         }
     }
 
-    onModified(path: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
-        if (path.length === 0) {
+    onModified(pathNames: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
+        if (pathNames.length === 0) {
             // The group level is immutable
-        } else if (path[0] === this.arrayName) {
+        } else if (pathNames[0] === this.arrayName) {
             // Shift the path by one
-            const shiftedPath = path.slice(1);
+            const shiftedPath = pathNames.slice(1);
             this.input.onModified(shiftedPath, (notifiedPath, key, name, value) => {
                 const itemHash = notifiedPath[0];
                 const groupHash = this.keyToGroupHash.get(itemHash);
@@ -105,7 +105,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
                 handler(modifiedPath, key, name, value);
             });
         } else {
-            this.input.onModified(path, handler);
+            this.input.onModified(pathNames, handler);
         }
     }
 
