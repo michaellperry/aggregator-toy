@@ -8,8 +8,6 @@ export type { AddOperator, SubtractOperator } from './steps/commutative-aggregat
 export { CommutativeAggregateStep } from './steps/commutative-aggregate';
 
 // Aggregate steps
-export { SumAggregateStep } from './steps/sum-aggregate';
-export { CountAggregateStep } from './steps/count-aggregate';
 export { MinAggregateStep } from './steps/min-aggregate';
 export { MaxAggregateStep } from './steps/max-aggregate';
 export { AverageAggregateStep } from './steps/average-aggregate';

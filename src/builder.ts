@@ -6,8 +6,6 @@ import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
 import { ScopedDefinePropertyStep } from './steps/scoped-define-property';
 import { NavigateToPath, TransformAtPath } from './types/path';
-import { SumAggregateStep } from './steps/sum-aggregate';
-import { CountAggregateStep } from './steps/count-aggregate';
 import { MinAggregateStep } from './steps/min-aggregate';
 import { MaxAggregateStep } from './steps/max-aggregate';
 import { AverageAggregateStep } from './steps/average-aggregate';
@@ -194,16 +192,19 @@ export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends strin
         propertyName: keyof NavigateToArrayItem<TScoped, [ArrayName]> & string,
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>> {
-        const fullPath = [...this.scopePath, arrayName];
-        const newStep = new SumAggregateStep(
-            this.lastStep,
-            fullPath,
+        return this.commutativeAggregate(
+            arrayName,
             outputProperty,
-            propertyName
-        );
-        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>>(
-            this.input,
-            newStep
+            (acc, item) => {
+                const value = (item as any)[propertyName];
+                const numValue = (value === null || value === undefined) ? 0 : Number(value);
+                return (acc ?? 0) + numValue;
+            },
+            (acc, item) => {
+                const value = (item as any)[propertyName];
+                const numValue = (value === null || value === undefined) ? 0 : Number(value);
+                return acc - numValue;
+            }
         );
     }
     
@@ -218,15 +219,11 @@ export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends strin
         arrayName: ArrayName,
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>> {
-        const fullPath = [...this.scopePath, arrayName];
-        const newStep = new CountAggregateStep(
-            this.lastStep,
-            fullPath,
-            outputProperty
-        );
-        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>>(
-            this.input,
-            newStep
+        return this.commutativeAggregate(
+            arrayName,
+            outputProperty,
+            (acc, _item) => (acc ?? 0) + 1,
+            (acc, _item) => acc - 1
         );
     }
     
@@ -446,15 +443,19 @@ export class PipelineBuilder<TStart, T extends {}> {
         propertyName: keyof NavigateToArrayItem<T, TPath> & string,
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>> {
-        const newStep = new SumAggregateStep(
-            this.lastStep,
+        return this.commutativeAggregate(
             arrayPath,
             outputProperty,
-            propertyName
-        );
-        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>>(
-            this.input,
-            newStep
+            (acc, item) => {
+                const value = (item as any)[propertyName];
+                const numValue = (value === null || value === undefined) ? 0 : Number(value);
+                return (acc ?? 0) + numValue;
+            },
+            (acc, item) => {
+                const value = (item as any)[propertyName];
+                const numValue = (value === null || value === undefined) ? 0 : Number(value);
+                return acc - numValue;
+            }
         );
     }
     
@@ -476,14 +477,11 @@ export class PipelineBuilder<TStart, T extends {}> {
         arrayPath: TPath,
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>> {
-        const newStep = new CountAggregateStep(
-            this.lastStep,
+        return this.commutativeAggregate(
             arrayPath,
-            outputProperty
-        );
-        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>>(
-            this.input,
-            newStep
+            outputProperty,
+            (acc, _item) => (acc ?? 0) + 1,
+            (acc, _item) => acc - 1
         );
     }
     
