@@ -6,8 +6,7 @@ import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
 import { ScopedDefinePropertyStep } from './steps/scoped-define-property';
 import { NavigateToPath, TransformAtPath } from './types/path';
-import { MinAggregateStep } from './steps/min-aggregate';
-import { MaxAggregateStep } from './steps/max-aggregate';
+import { MinMaxAggregateStep } from './steps/min-max-aggregate';
 import { AverageAggregateStep } from './steps/average-aggregate';
 
 // Public types (exported for use in build() signature)
@@ -240,11 +239,12 @@ export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends strin
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>> {
         const fullPath = [...this.scopePath, arrayName];
-        const newStep = new MinAggregateStep(
+        const newStep = new MinMaxAggregateStep(
             this.lastStep,
             fullPath,
             outputProperty,
-            propertyName
+            propertyName,
+            (values) => Math.min(...values)
         );
         return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>>(
             this.input,
@@ -265,11 +265,12 @@ export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends strin
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>> {
         const fullPath = [...this.scopePath, arrayName];
-        const newStep = new MaxAggregateStep(
+        const newStep = new MinMaxAggregateStep(
             this.lastStep,
             fullPath,
             outputProperty,
-            propertyName
+            propertyName,
+            (values) => Math.max(...values)
         );
         return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>>(
             this.input,
@@ -505,11 +506,12 @@ export class PipelineBuilder<TStart, T extends {}> {
         propertyName: keyof NavigateToArrayItem<T, TPath> & string,
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>> {
-        const newStep = new MinAggregateStep(
+        const newStep = new MinMaxAggregateStep(
             this.lastStep,
             arrayPath,
             outputProperty,
-            propertyName
+            propertyName,
+            (values) => Math.min(...values)
         );
         return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>(
             this.input,
@@ -537,11 +539,12 @@ export class PipelineBuilder<TStart, T extends {}> {
         propertyName: keyof NavigateToArrayItem<T, TPath> & string,
         outputProperty: TPropName
     ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>> {
-        const newStep = new MaxAggregateStep(
+        const newStep = new MinMaxAggregateStep(
             this.lastStep,
             arrayPath,
             outputProperty,
-            propertyName
+            propertyName,
+            (values) => Math.max(...values)
         );
         return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>(
             this.input,

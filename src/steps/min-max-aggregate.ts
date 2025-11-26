@@ -8,13 +8,13 @@ function computePathHash(path: string[]): string {
 }
 
 /**
- * A step that computes the maximum value of a property over items in a nested array.
+ * A step that computes the minimum or maximum value of a property over items in a nested array.
  * 
  * - Returns undefined for empty arrays
  * - Ignores null/undefined values in comparison
- * - Handles removal by tracking all values and recalculating max
+ * - Handles removal by tracking all values and recalculating
  */
-export class MaxAggregateStep<
+export class MinMaxAggregateStep<
     TInput,
     TPath extends string[],
     TPropertyName extends string
@@ -36,7 +36,8 @@ export class MaxAggregateStep<
         private input: Step,
         private arrayPath: TPath,
         private propertyName: TPropertyName,
-        private numericProperty: string
+        private numericProperty: string,
+        private aggregateFn: (values: number[]) => number
     ) {
         // Register with input step to receive item add/remove events at the target array level
         this.input.onAdded(this.arrayPath, (path, key, immutableProps) => {
@@ -111,9 +112,9 @@ export class MaxAggregateStep<
             }
         }
         
-        // Compute new max
+        // Compute new aggregate using the provided function
         const values = this.valueStore.get(parentHash) || [];
-        const newMax = values.length > 0 ? Math.max(...values) : undefined;
+        const newAggregate = values.length > 0 ? this.aggregateFn(values) : undefined;
         
         // Emit modification event
         if (parentPath.length > 0) {
@@ -121,12 +122,12 @@ export class MaxAggregateStep<
             const pathToParent = parentPath.slice(0, -1);
             
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler(pathToParent, parentKey, this.propertyName, newMax);
+                handler(pathToParent, parentKey, this.propertyName, newAggregate);
             });
         } else {
             // Parent is at root level
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler([], '', this.propertyName, newMax);
+                handler([], '', this.propertyName, newAggregate);
             });
         }
     }
@@ -169,9 +170,9 @@ export class MaxAggregateStep<
             }
         }
         
-        // Compute new max
+        // Compute new aggregate using the provided function
         const values = this.valueStore.get(parentHash) || [];
-        const newMax = values.length > 0 ? Math.max(...values) : undefined;
+        const newAggregate = values.length > 0 ? this.aggregateFn(values) : undefined;
         
         // Emit modification event
         if (parentPath.length > 0) {
@@ -179,11 +180,11 @@ export class MaxAggregateStep<
             const pathToParent = parentPath.slice(0, -1);
             
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler(pathToParent, parentKey, this.propertyName, newMax);
+                handler(pathToParent, parentKey, this.propertyName, newAggregate);
             });
         } else {
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler([], '', this.propertyName, newMax);
+                handler([], '', this.propertyName, newAggregate);
             });
         }
     }
