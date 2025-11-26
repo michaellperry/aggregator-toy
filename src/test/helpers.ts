@@ -26,7 +26,7 @@ export function createTestPipeline<TBuilder extends PipelineBuilder<any, any>>(
     // Use the actual output type from the builder, not the input type
     const [ getState, setState ] = simulateState<KeyedArray<OutputType>>([]);
     const typeDescriptor = builder.getTypeDescriptor();
-    const pipeline = builder.build(setState);
+    const pipeline = builder.build(setState, typeDescriptor);
     const getOutput = (): OutputType[] => extract(getState(), typeDescriptor);
     return [pipeline, getOutput];
 }

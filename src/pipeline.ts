@@ -34,7 +34,6 @@ export function getPathNamesFromDescriptor(descriptor: TypeDescriptor): string[]
 }
 
 export interface Step {
-    getPathNames(): string[][];
     getTypeDescriptor(): TypeDescriptor;
     onAdded(path: string[], handler: OnAddedHandler): void;
     onRemoved(path: string[], handler: OnRemovedHandler): void;

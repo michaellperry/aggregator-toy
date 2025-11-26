@@ -11,10 +11,6 @@ class InputPipeline<T> implements Pipeline<T>, Step {
         return { arrays: [] }; // No arrays at input level
     }
 
-    getPathNames(): string[][] {
-        return getPathNamesFromDescriptor(this.getTypeDescriptor());
-    }
-
     add(key: string, immutableProps: T): void {
         const pathKey = [].join(':');
         const handlersForPath = this.handlers.get(pathKey) || [];

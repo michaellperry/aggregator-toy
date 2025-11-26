@@ -7,10 +7,6 @@ export class DefinePropertyStep<T, K extends string, U> implements Step {
     getTypeDescriptor(): TypeDescriptor {
         return this.input.getTypeDescriptor();
     }
-
-    getPathNames(): string[][] {
-        return getPathNamesFromDescriptor(this.getTypeDescriptor());
-    }
     
     onAdded(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
         this.input.onAdded(path, (path, key, immutableProps) => {

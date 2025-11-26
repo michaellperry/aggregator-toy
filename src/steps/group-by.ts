@@ -1,5 +1,5 @@
 import type { ImmutableProps, OnAddedHandler, OnRemovedHandler, Step } from '../pipeline';
-import { getPathNamesFromDescriptor, type TypeDescriptor } from '../pipeline';
+import { type TypeDescriptor } from '../pipeline';
 import { computeKeyHash } from "../util/hash";
 
 export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step {
@@ -7,6 +7,8 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
     itemAddedHandlers: OnAddedHandler[] = [];
     groupRemovedHandlers: OnRemovedHandler[] = [];
     itemRemovedHandlers: OnRemovedHandler[] = [];
+    nestedAddedHandlers: Map<string, OnAddedHandler[]> = new Map<string, OnAddedHandler[]>();
+    nestedRemovedHandlers: Map<string, OnRemovedHandler[]> = new Map<string, OnRemovedHandler[]>();
 
     keyToGroupHash: Map<string, string> = new Map<string, string>();
     groupToKeys: Map<string, Set<string>> = new Map<string, Set<string>>();
@@ -38,10 +40,6 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         };
     }
 
-    getPathNames(): string[][] {
-        return getPathNamesFromDescriptor(this.getTypeDescriptor());
-    }
-
     onAdded(path: string[], handler: OnAddedHandler): void {
         if (path.length === 0) {
             // Handler is at the group level
@@ -51,6 +49,26 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             this.itemAddedHandlers.push(handler);
         } else if (path.length > 1 && path[0] === this.arrayName) {
             // Handler is below this array in the tree
+            const shiftedPath = path.slice(1);
+            const pathKey = shiftedPath.join(':');
+            
+            // Store the handler
+            const handlers = this.nestedAddedHandlers.get(pathKey) || [];
+            handlers.push(handler);
+            this.nestedAddedHandlers.set(pathKey, handlers);
+            
+            // Register interceptor with input if this is the first handler for this path
+            if (handlers.length === 1) {
+                this.input.onAdded(shiftedPath, (notifiedPath, key, immutableProps) => {
+                    const groupHash = this.keyToGroupHash.get(key);
+                    if (groupHash === undefined) {
+                        throw new Error(`GroupByStep: item with key "${key}" not found when handling nested path notification`);
+                    }
+                    const modifiedPath = [groupHash, ...notifiedPath];
+                    const handlersForPath = this.nestedAddedHandlers.get(pathKey) || [];
+                    handlersForPath.forEach(h => h(modifiedPath, key, immutableProps));
+                });
+            }
         } else {
             this.input.onAdded(path, handler);
         }
@@ -65,6 +83,26 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             this.itemRemovedHandlers.push(handler);
         } else if (path.length > 1 && path[0] === this.arrayName) {
             // Handler is below this array in the tree
+            const shiftedPath = path.slice(1);
+            const pathKey = shiftedPath.join(':');
+            
+            // Store the handler
+            const handlers = this.nestedRemovedHandlers.get(pathKey) || [];
+            handlers.push(handler);
+            this.nestedRemovedHandlers.set(pathKey, handlers);
+            
+            // Register interceptor with input if this is the first handler for this path
+            if (handlers.length === 1) {
+                this.input.onRemoved(shiftedPath, (notifiedPath, key) => {
+                    const groupHash = this.keyToGroupHash.get(key);
+                    if (groupHash === undefined) {
+                        throw new Error(`GroupByStep: item with key "${key}" not found when handling nested path removal notification`);
+                    }
+                    const modifiedPath = [groupHash, ...notifiedPath];
+                    const handlersForPath = this.nestedRemovedHandlers.get(pathKey) || [];
+                    handlersForPath.forEach(h => h(modifiedPath, key));
+                });
+            }
         } else {
             this.input.onRemoved(path, handler);
         }

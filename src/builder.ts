@@ -1,4 +1,4 @@
-import type { ImmutableProps, Pipeline, Step, TypeDescriptor } from './pipeline';
+import { getPathNamesFromDescriptor, type ImmutableProps, type Pipeline, type Step, type TypeDescriptor } from './pipeline';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
@@ -34,8 +34,8 @@ export class PipelineBuilder<TStart, T extends {}> {
         return this.lastStep.getTypeDescriptor();
     }
 
-    build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {
-        const pathNames = this.lastStep.getPathNames();
+    build(setState: (transform: Transform<KeyedArray<T>>) => void, typeDescriptor: TypeDescriptor): Pipeline<TStart> {
+        const pathNames = getPathNamesFromDescriptor(typeDescriptor);
         
         // Register handlers for each path the step will emit
         pathNames.forEach(pathName => {
