@@ -53,9 +53,10 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             
             // Register interceptor with input
             this.input.onAdded(shiftedPath, (notifiedPath, key, immutableProps) => {
-                const groupHash = this.keyToGroupHash.get(key);
+                const itemHash = notifiedPath[0];
+                const groupHash = this.keyToGroupHash.get(itemHash);
                 if (groupHash === undefined) {
-                    throw new Error(`GroupByStep: item with key "${key}" not found when handling nested path notification`);
+                    throw new Error(`GroupByStep: item with key "${itemHash}" not found when handling nested path addition notification`);
                 }
                 const modifiedPath = [groupHash, ...notifiedPath];
                 handler(modifiedPath, key, immutableProps);
@@ -85,9 +86,10 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             // Register interceptor with input if this is the first handler for this path
             if (handlers.length === 1) {
                 this.input.onRemoved(shiftedPath, (notifiedPath, key) => {
-                    const groupHash = this.keyToGroupHash.get(key);
+                    const itemHash = notifiedPath[0];
+                    const groupHash = this.keyToGroupHash.get(itemHash);
                     if (groupHash === undefined) {
-                        throw new Error(`GroupByStep: item with key "${key}" not found when handling nested path removal notification`);
+                        throw new Error(`GroupByStep: item with key "${itemHash}" not found when handling nested path removal notification`);
                     }
                     const modifiedPath = [groupHash, ...notifiedPath];
                     const handlersForPath = this.nestedRemovedHandlers.get(pathKey) || [];
