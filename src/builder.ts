@@ -4,6 +4,7 @@ import { DefinePropertyStep } from './steps/define-property';
 import { DropArrayStep } from './steps/drop-array';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
+import { NavigateToPath, TransformAtPath } from './types/path';
 
 // Public types (exported for use in build() signature)
 export type KeyedArray<T> = { key: string, value: T }[];
@@ -85,6 +86,155 @@ type DropArrayFromPath<
                 : never
             : never
         : never;
+
+/**
+ * A builder that operates within a scoped path context.
+ * Operations modify types at the scoped depth while preserving ancestor structure.
+ */
+export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends string[]> {
+    constructor(
+        private input: Pipeline<TStart>,
+        private lastStep: Step,
+        private scopePath: Path
+    ) {}
+    
+    /**
+     * Groups items by key properties at the scoped level, creating a nested array.
+     */
+    groupBy<K extends keyof TScoped, ArrayName extends string>(
+        keyProperties: K[],
+        arrayName: ArrayName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<{
+        [P in K]: TScoped[P]
+    } & {
+        [P in ArrayName]: KeyedArray<{
+            [Q in Exclude<keyof TScoped, K>]: TScoped[Q]
+        }>
+    }>>> {
+        const newStep = new GroupByStep<TScoped & {}, K, ArrayName>(
+            this.lastStep,
+            keyProperties as K[],
+            arrayName,
+            this.scopePath as string[]
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<{
+            [P in K]: TScoped[P]
+        } & {
+            [P in ArrayName]: KeyedArray<{
+                [Q in Exclude<keyof TScoped, K>]: TScoped[Q]
+            }>
+        }>>>(this.input, newStep);
+    }
+    
+    /**
+     * Defines a computed property on items at the scoped path.
+     */
+    defineProperty<PropName extends string, PropType>(
+        propertyName: PropName,
+        compute: (item: TScoped) => PropType
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, TScoped & Record<PropName, PropType>>> {
+        // DefinePropertyStep needs to operate at the scoped level
+        // We wrap it to only apply to items at the scope path
+        const newStep = new ScopedDefinePropertyStep(
+            this.lastStep,
+            propertyName,
+            compute as (item: unknown) => PropType,
+            this.scopePath as string[]
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, TScoped & Record<PropName, PropType>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Computes an aggregate over a nested array within the scope.
+     * Takes just the array name - the scope provides the path prefix.
+     * The aggregate is added alongside the array (use dropArray to remove the array).
+     */
+    commutativeAggregate<
+        ArrayName extends keyof TScoped & string,
+        PropName extends string,
+        TAggregate
+    >(
+        arrayName: ArrayName,
+        propertyName: PropName,
+        add: AddOperator<TScoped[ArrayName] extends KeyedArray<infer U> ? U : never, TAggregate>,
+        subtract: SubtractOperator<TScoped[ArrayName] extends KeyedArray<infer U> ? U : never, TAggregate>
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<PropName, TAggregate>>>> {
+        // Full path = scope path + array name
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new CommutativeAggregateStep(
+            this.lastStep,
+            fullPath,
+            propertyName,
+            { add: add as AddOperator<ImmutableProps, TAggregate>, subtract: subtract as SubtractOperator<ImmutableProps, TAggregate> }
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<PropName, TAggregate>>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Drops an array within the scope.
+     * Takes just the array name - the scope provides the path prefix.
+     */
+    dropArray<ArrayName extends keyof TScoped & string>(
+        arrayName: ArrayName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Omit<TScoped, ArrayName>>> {
+        // Full path = scope path + array name
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new DropArrayStep(this.lastStep, fullPath);
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Omit<TScoped, ArrayName>>>(
+            this.input,
+            newStep
+        );
+    }
+}
+
+/**
+ * A step that applies defineProperty only to items at a specific scope path.
+ */
+class ScopedDefinePropertyStep<T, K extends string, U> implements Step {
+    constructor(
+        private input: Step,
+        private propertyName: K,
+        private compute: (item: unknown) => U,
+        private scopePath: string[]
+    ) {}
+    
+    getTypeDescriptor(): TypeDescriptor {
+        return this.input.getTypeDescriptor();
+    }
+    
+    onAdded(pathNames: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
+        if (this.isAtScopePath(pathNames)) {
+            // Apply the property transformation at the scoped level
+            this.input.onAdded(pathNames, (path, key, immutableProps) => {
+                handler(path, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps) });
+            });
+        } else {
+            // Pass through unchanged
+            this.input.onAdded(pathNames, handler);
+        }
+    }
+    
+    onRemoved(pathNames: string[], handler: (path: string[], key: string) => void): void {
+        this.input.onRemoved(pathNames, handler);
+    }
+    
+    onModified(pathNames: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
+        this.input.onModified(pathNames, handler);
+    }
+    
+    private isAtScopePath(pathNames: string[]): boolean {
+        if (pathNames.length !== this.scopePath.length) {
+            return false;
+        }
+        return pathNames.every((name, i) => name === this.scopePath[i]);
+    }
+}
 
 export class PipelineBuilder<TStart, T extends {}> {
     constructor(private input: Pipeline<TStart>, private lastStep: Step) {}
@@ -187,6 +337,22 @@ export class PipelineBuilder<TStart, T extends {}> {
         return new PipelineBuilder<TStart, DropArrayFromPath<T, TPath>>(
             this.input,
             newStep
+        );
+    }
+    
+    /**
+     * Creates a scoped builder that applies operations at the specified path depth.
+     *
+     * @param pathSegments - Variadic path segments to navigate to
+     * @returns A ScopedBuilder for operating at that depth
+     */
+    in<Path extends string[]>(
+        ...pathSegments: Path
+    ): ScopedBuilder<TStart, T, NavigateToPath<T, Path> & {}, Path> {
+        return new ScopedBuilder<TStart, T, NavigateToPath<T, Path> & {}, Path>(
+            this.input,
+            this.lastStep,
+            pathSegments
         );
     }
 
