@@ -1,4 +1,5 @@
 import { getPathNamesFromDescriptor, type ImmutableProps, type Pipeline, type Step, type TypeDescriptor } from './pipeline';
+import { CommutativeAggregateStep, type AddOperator, type SubtractOperator } from './steps/commutative-aggregate';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
@@ -9,6 +10,58 @@ export type Transform<T> = (state: T) => T;
 
 // Type utility to expand intersection types into a single object type for better IDE display
 type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
+
+// Type utilities for commutativeAggregate
+
+/**
+ * Navigates through a type following a path of array property names.
+ * Returns the item type of the final array in the path.
+ */
+type NavigateToArrayItem<T, Path extends string[]> =
+    Path extends [infer First extends string, ...infer Rest extends string[]]
+        ? First extends keyof T
+            ? T[First] extends KeyedArray<infer ItemType>
+                ? Rest extends []
+                    ? ItemType  // Reached the target array
+                    : NavigateToArrayItem<ItemType, Rest>  // Continue navigating
+                : never  // Property is not an array
+            : never  // Property doesn't exist
+        : never;  // Empty path
+
+/**
+ * Replaces an array property with an aggregate property at a specific level.
+ */
+type ReplaceArrayWithAggregate<
+    T,
+    ArrayName extends string,
+    PropName extends string,
+    TAggregate
+> = Expand<Omit<T, ArrayName> & Record<PropName, TAggregate>>;
+
+/**
+ * Transforms the output type by navigating to the parent level and
+ * replacing the target array with the aggregate property.
+ */
+type TransformWithAggregate<
+    T,
+    Path extends string[],
+    PropName extends string,
+    TAggregate
+> = Path extends [infer ArrayName extends string]
+    // Single-level path: replace directly in T
+    ? ReplaceArrayWithAggregate<T, ArrayName, PropName, TAggregate>
+    // Multi-level path: navigate and transform recursively
+    : Path extends [infer First extends string, ...infer Rest extends string[]]
+        ? First extends keyof T
+            ? T[First] extends KeyedArray<infer ItemType>
+                ? Expand<Omit<T, First> & {
+                    [K in First]: KeyedArray<
+                        TransformWithAggregate<ItemType, Rest & string[], PropName, TAggregate>
+                    >
+                }>
+                : never
+            : never
+        : never;
 
 export class PipelineBuilder<TStart, T extends {}> {
     constructor(private input: Pipeline<TStart>, private lastStep: Step) {}
@@ -41,6 +94,50 @@ export class PipelineBuilder<TStart, T extends {}> {
                 [Q in Exclude<keyof T, K>]: T[Q]
             }>
         }>>(this.input, newStep);
+    }
+
+    /**
+     * Computes an aggregate value over items in a nested array.
+     *
+     * The aggregate is computed incrementally as items are added or removed.
+     * The target array is replaced with the aggregate property in the output type.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     * @param propertyName - Name of the new aggregate property
+     * @param add - Operator called when an item is added
+     * @param subtract - Operator called when an item is removed
+     *
+     * @example
+     * // Sum of hours across all tasks for each employee
+     * .commutativeAggregate(
+     *     ['employees', 'tasks'],
+     *     'totalHours',
+     *     (acc, task) => (acc ?? 0) + task.hours,
+     *     (acc, task) => acc - task.hours
+     * )
+     */
+    commutativeAggregate<
+        TPath extends string[],
+        TPropName extends string,
+        TAggregate
+    >(
+        arrayPath: TPath,
+        propertyName: TPropName,
+        add: AddOperator<NavigateToArrayItem<T, TPath>, TAggregate>,
+        subtract: SubtractOperator<NavigateToArrayItem<T, TPath>, TAggregate>
+    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, TAggregate>> {
+        // Cast through any since the runtime types will match correctly
+        // CommutativeAggregateStep uses ImmutableProps internally for flexibility
+        const newStep = new CommutativeAggregateStep(
+            this.lastStep,
+            arrayPath,
+            propertyName,
+            { add: add as AddOperator<ImmutableProps, TAggregate>, subtract: subtract as SubtractOperator<ImmutableProps, TAggregate> }
+        );
+        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, TAggregate>>(
+            this.input,
+            newStep
+        );
     }
 
     getTypeDescriptor(): TypeDescriptor {
