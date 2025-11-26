@@ -5,8 +5,12 @@ import { computeKeyHash } from "../util/hash";
 export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step {
     groupAddedHandlers: OnAddedHandler[] = [];
     itemAddedHandlers: OnAddedHandler[] = [];
+    groupRemovedHandlers: OnRemovedHandler[] = [];
+    itemRemovedHandlers: OnRemovedHandler[] = [];
 
-    groups: Set<string> = new Set<string>();
+    keyToGroupHash: Map<string, string> = new Map<string, string>();
+    groupToKeys: Map<string, Set<string>> = new Map<string, Set<string>>();
+    groupToKeyProps: Map<string, ImmutableProps> = new Map<string, ImmutableProps>();
 
     constructor(
         private input: Step,
@@ -53,6 +57,17 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
     }
 
     onRemoved(path: string[], handler: OnRemovedHandler): void {
+        if (path.length === 0) {
+            // Handler is at the group level
+            this.groupRemovedHandlers.push(handler);
+        } else if (path.length === 1 && path[0] === this.arrayName) {
+            // Handler is at the item level
+            this.itemRemovedHandlers.push(handler);
+        } else if (path.length > 1 && path[0] === this.arrayName) {
+            // Handler is below this array in the tree
+        } else {
+            this.input.onRemoved(path, handler);
+        }
     }
 
     private handleAdded(path: string[], key: string, immutableProps: ImmutableProps) {
@@ -68,11 +83,21 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         });
         // Compute the hash of the extracted properties
         const keyHash = computeKeyHash(keyProps, this.keyProperties.map(prop => prop.toString()));
-        if (!this.groups.has(keyHash)) {
-            this.groups.add(keyHash);
+        
+        // Store key-to-group mapping
+        this.keyToGroupHash.set(key, keyHash);
+        
+        // Add key to group's set
+        const isNewGroup = !this.groupToKeys.has(keyHash);
+        if (isNewGroup) {
+            this.groupToKeys.set(keyHash, new Set<string>());
             // Notify the group handlers of the new group object
             this.groupAddedHandlers.forEach(handler => handler([], keyHash, keyProps));
         }
+        this.groupToKeys.get(keyHash)!.add(key);
+        
+        // Store key properties for the group
+        this.groupToKeyProps.set(keyHash, keyProps);
         // Extract the non-key properties from the object
         let nonKeyProps: ImmutableProps = {};
         Object.keys(immutableProps).forEach(prop => {
@@ -88,7 +113,34 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         if (path.length !== 0) {
             throw new Error("GroupByStep notified of item removed at a different level");
         }
-        throw new Error("Method not implemented.");
+        
+        // Look up group hash
+        const keyHash = this.keyToGroupHash.get(key);
+        if (keyHash === undefined) {
+            throw new Error(`GroupByStep: item with key "${key}" not found`);
+        }
+        
+        // Notify item removed handlers
+        this.itemRemovedHandlers.forEach(handler => handler([keyHash], key));
+        
+        // Remove key from tracking
+        this.keyToGroupHash.delete(key);
+        
+        // Remove key from group's set
+        const groupKeys = this.groupToKeys.get(keyHash);
+        if (groupKeys) {
+            groupKeys.delete(key);
+            
+            // Check if group is empty
+            if (groupKeys.size === 0) {
+                // Notify group removed handlers
+                this.groupRemovedHandlers.forEach(handler => handler([], keyHash));
+                
+                // Clean up tracking
+                this.groupToKeys.delete(keyHash);
+                this.groupToKeyProps.delete(keyHash);
+            }
+        }
     }
 }
 

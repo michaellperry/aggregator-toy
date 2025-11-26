@@ -44,7 +44,7 @@ export class PipelineBuilder<TStart, T extends {}> {
             });
             
             this.lastStep.onRemoved(pathName, (path, key) => {
-                setState(state => state.filter(item => item.key !== key));
+                setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
             });
         });
         
@@ -63,9 +63,9 @@ function addToKeyedArray(state: KeyedArray<any>, pathName: string[], path: strin
         if (path.length === 0) {
             throw new Error("Mismatched path length when setting state");
         }
-        const key = path[0];
+        const parentKey = path[0];
         const arrayName = pathName[0];
-        const existingItemIndex = state.findIndex(item => item.key === key);
+        const existingItemIndex = state.findIndex(item => item.key === parentKey);
         if (existingItemIndex < 0) {
             throw new Error("Path references unknown item when setting state");
         }
@@ -73,7 +73,42 @@ function addToKeyedArray(state: KeyedArray<any>, pathName: string[], path: strin
         const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
         const modifiedArray = addToKeyedArray(existingArray, pathName.slice(1), path.slice(1), key, immutableProps);
         const modifiedItem = {
-            key,
+            key: parentKey,
+            value: {
+                ...existingItem.value,
+                [pathName[0]]: modifiedArray
+            }
+        };
+        return [
+            ...state.slice(0, existingItemIndex),
+            modifiedItem,
+            ...state.slice(existingItemIndex+1)
+        ];
+    }
+}
+
+function removeFromKeyedArray(state: KeyedArray<any>, pathName: string[], path: string[], key: string): KeyedArray<any> {
+    if (pathName.length === 0) {
+        if (path.length !== 0) {
+            throw new Error("Mismatched path length when removing from state");
+        }
+        return state.filter(item => item.key !== key);
+    }
+    else {
+        if (path.length === 0) {
+            throw new Error("Mismatched path length when removing from state");
+        }
+        const parentKey = path[0];
+        const arrayName = pathName[0];
+        const existingItemIndex = state.findIndex(item => item.key === parentKey);
+        if (existingItemIndex < 0) {
+            throw new Error("Path references unknown item when removing from state");
+        }
+        const existingItem = state[existingItemIndex];
+        const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
+        const modifiedArray = removeFromKeyedArray(existingArray, pathName.slice(1), path.slice(1), key);
+        const modifiedItem = {
+            key: parentKey,
             value: {
                 ...existingItem.value,
                 [pathName[0]]: modifiedArray
