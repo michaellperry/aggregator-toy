@@ -2,6 +2,7 @@ import { createPipeline, TypeDescriptor } from '../index';
 import { CommutativeAggregateStep, AddOperator, SubtractOperator } from '../steps/commutative-aggregate';
 import { DropArrayStep } from '../steps/drop-array';
 import type { Step, ImmutableProps } from '../pipeline';
+import { createTestPipeline } from './helpers';
 
 // Helper type aliases for cleaner test code
 type NumericAddOp = AddOperator<ImmutableProps, number>;
@@ -834,6 +835,371 @@ describe('CommutativeAggregateStep', () => {
             inputPipeline.remove('item2');
             
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(2);
+        });
+    });
+
+    describe('CommutativeAggregateStep - Builder API', () => {
+        describe('basic sum aggregation', () => {
+            it('should compute sum aggregate using builder API', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; itemName: string; price: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'totalPrice',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
+                            (acc: number, item: any) => acc - item.price
+                        )
+                );
+
+                pipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
+
+                const output = getOutput();
+                expect(output.length).toBe(1);
+                expect(output[0].category).toBe('Electronics');
+                expect(output[0].totalPrice).toBe(500);
+            });
+
+            it('should accumulate sum when multiple items are added (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; itemName: string; price: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'totalPrice',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
+                            (acc: number, item: any) => acc - item.price
+                        )
+                );
+
+                pipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
+                pipeline.add('item2', { category: 'Electronics', itemName: 'Laptop', price: 1200 });
+                pipeline.add('item3', { category: 'Electronics', itemName: 'Tablet', price: 300 });
+
+                const output = getOutput();
+                const group = output.find(g => g.category === 'Electronics');
+                expect(group).toBeDefined();
+                expect(group?.totalPrice).toBe(2000); // 500 + 1200 + 300
+            });
+        });
+
+        describe('subtract functionality', () => {
+            it('should reduce aggregate when items are removed (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; itemName: string; price: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'totalPrice',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
+                            (acc: number, item: any) => acc - item.price
+                        )
+                );
+
+                pipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
+                pipeline.add('item2', { category: 'Electronics', itemName: 'Laptop', price: 1200 });
+
+                let output = getOutput();
+                let group = output.find(g => g.category === 'Electronics');
+                expect(group?.totalPrice).toBe(1700);
+
+                pipeline.remove('item1');
+
+                output = getOutput();
+                group = output.find(g => g.category === 'Electronics');
+                expect(group?.totalPrice).toBe(1200);
+            });
+
+            it('should handle removal of all items (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; price: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'total',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
+                            (acc: number, item: any) => acc - item.price
+                        )
+                );
+
+                pipeline.add('item1', { category: 'A', price: 100 });
+                pipeline.add('item2', { category: 'A', price: 200 });
+
+                pipeline.remove('item1');
+                pipeline.remove('item2');
+
+                const output = getOutput();
+                // Group should be removed when all items are removed
+                expect(output.length).toBe(0);
+            });
+        });
+
+        describe('multiple parents (scoped aggregation)', () => {
+            it('should maintain independent aggregate state per parent (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; itemName: string; price: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'totalPrice',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
+                            (acc: number, item: any) => acc - item.price
+                        )
+                );
+
+                pipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
+                pipeline.add('item2', { category: 'Clothing', itemName: 'Shirt', price: 50 });
+                pipeline.add('item3', { category: 'Electronics', itemName: 'Laptop', price: 1200 });
+                pipeline.add('item4', { category: 'Clothing', itemName: 'Pants', price: 80 });
+
+                const output = getOutput();
+                const electronicsGroup = output.find(g => g.category === 'Electronics');
+                const clothingGroup = output.find(g => g.category === 'Clothing');
+
+                expect(electronicsGroup?.totalPrice).toBe(1700); // 500 + 1200
+                expect(clothingGroup?.totalPrice).toBe(130); // 50 + 80
+            });
+
+            it('should not affect other parents when removing from one parent (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ department: string; employee: string; salary: number }>()
+                        .groupBy(['department'], 'employees')
+                        .commutativeAggregate(
+                            ['employees'] as ['employees'],
+                            'totalSalary',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.salary,
+                            (acc: number, item: any) => acc - item.salary
+                        )
+                );
+
+                pipeline.add('emp1', { department: 'Engineering', employee: 'Alice', salary: 100000 });
+                pipeline.add('emp2', { department: 'Sales', employee: 'Bob', salary: 80000 });
+                pipeline.add('emp3', { department: 'Engineering', employee: 'Carol', salary: 120000 });
+
+                let output = getOutput();
+                let engineeringGroup = output.find(g => g.department === 'Engineering');
+                let salesGroup = output.find(g => g.department === 'Sales');
+                expect(engineeringGroup?.totalSalary).toBe(220000); // 100000 + 120000
+                expect(salesGroup?.totalSalary).toBe(80000);
+
+                pipeline.remove('emp1');
+
+                output = getOutput();
+                engineeringGroup = output.find(g => g.department === 'Engineering');
+                salesGroup = output.find(g => g.department === 'Sales');
+                expect(engineeringGroup?.totalSalary).toBe(120000); // Reduced
+                expect(salesGroup?.totalSalary).toBe(80000); // Unchanged
+            });
+        });
+
+        describe('nested array path', () => {
+            it('should navigate through nested arrays correctly (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
+                        .groupBy(['state', 'city'], 'venues')
+                        .groupBy(['state'], 'cities')
+                        .commutativeAggregate(
+                            ['cities', 'venues'] as ['cities', 'venues'],
+                            'totalCapacity',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.capacity,
+                            (acc: number, item: any) => acc - item.capacity
+                        )
+                );
+
+                pipeline.add('v1', { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
+                pipeline.add('v2', { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
+
+                const output = getOutput();
+                const txState = output.find(s => s.state === 'TX');
+                expect(txState).toBeDefined();
+                const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+                expect(dallasCity?.totalCapacity).toBe(70000);
+            });
+
+            it('should maintain separate aggregates for each nested parent (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
+                        .groupBy(['state', 'city'], 'venues')
+                        .groupBy(['state'], 'cities')
+                        .commutativeAggregate(
+                            ['cities', 'venues'] as ['cities', 'venues'],
+                            'venueCount',
+                            (acc: number | undefined, _item: any) => (acc ?? 0) + 1,
+                            (acc: number, _item: any) => acc - 1
+                        )
+                );
+
+                pipeline.add('v1', { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
+                pipeline.add('v2', { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
+                pipeline.add('v3', { state: 'TX', city: 'Houston', venue: 'Center', capacity: 18000 });
+
+                const output = getOutput();
+                const txState = output.find(s => s.state === 'TX');
+                const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+                const houstonCity = txState?.cities.find((c: any) => c.city === 'Houston');
+
+                expect(dallasCity?.venueCount).toBe(2);
+                expect(houstonCity?.venueCount).toBe(1);
+            });
+        });
+
+        describe('edge cases', () => {
+            it('should handle zero values correctly (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; value: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'total',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
+                            (acc: number, item: any) => acc - item.value
+                        )
+                );
+
+                pipeline.add('item1', { category: 'A', value: 0 });
+                pipeline.add('item2', { category: 'A', value: 100 });
+                pipeline.add('item3', { category: 'A', value: 0 });
+
+                const output = getOutput();
+                const group = output.find(g => g.category === 'A');
+                expect(group?.total).toBe(100);
+            });
+
+            it('should handle negative values correctly (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; value: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'total',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
+                            (acc: number, item: any) => acc - item.value
+                        )
+                );
+
+                pipeline.add('item1', { category: 'A', value: 100 });
+                pipeline.add('item2', { category: 'A', value: -30 });
+
+                let output = getOutput();
+                let group = output.find(g => g.category === 'A');
+                expect(group?.total).toBe(70);
+
+                pipeline.remove('item2');
+                output = getOutput();
+                group = output.find(g => g.category === 'A');
+                expect(group?.total).toBe(100);
+            });
+
+            it('should handle single-element arrays (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; value: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'total',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
+                            (acc: number, item: any) => acc - item.value
+                        )
+                );
+
+                pipeline.add('item1', { category: 'A', value: 42 });
+
+                let output = getOutput();
+                let group = output.find(g => g.category === 'A');
+                expect(group?.total).toBe(42);
+
+                pipeline.remove('item1');
+                output = getOutput();
+                expect(output.length).toBe(0);
+            });
+        });
+
+        describe('integration with other steps', () => {
+            it('should work with dropArray to keep aggregate but remove array (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; value: number }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'total',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
+                            (acc: number, item: any) => acc - item.value
+                        )
+                        .dropArray(['items'] as ['items'])
+                );
+
+                pipeline.add('item1', { category: 'A', value: 10 });
+                pipeline.add('item2', { category: 'A', value: 20 });
+                pipeline.add('item3', { category: 'B', value: 30 });
+
+                let output = getOutput();
+                expect(output.length).toBe(2);
+                const groupA = output.find(g => g.category === 'A');
+                const groupB = output.find(g => g.category === 'B');
+
+                expect(groupA?.category).toBe('A');
+                expect(groupA?.total).toBe(30);
+                expect((groupA as any)?.items).toBeUndefined();
+
+                expect(groupB?.category).toBe('B');
+                expect(groupB?.total).toBe(30);
+                expect((groupB as any)?.items).toBeUndefined();
+
+                pipeline.remove('item1');
+                output = getOutput();
+                const groupAAfter = output.find(g => g.category === 'A');
+                expect(groupAAfter?.total).toBe(20);
+                expect((groupAAfter as any)?.items).toBeUndefined();
+            });
+
+            it('should work with defineProperty before aggregation (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; price: number; quantity: number }>()
+                        .groupBy(['category'], 'items')
+                        .defineProperty('extendedPrice', (item: any) => item.price * item.quantity)
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'totalRevenue',
+                            (acc: number | undefined, item: any) => (acc ?? 0) + item.extendedPrice,
+                            (acc: number, item: any) => acc - item.extendedPrice
+                        )
+                );
+
+                pipeline.add('item1', { category: 'A', price: 10, quantity: 2 });
+                pipeline.add('item2', { category: 'A', price: 5, quantity: 3 });
+
+                const output = getOutput();
+                const group = output.find(g => g.category === 'A');
+                expect(group?.totalRevenue).toBe(35); // (10 * 2) + (5 * 3) = 20 + 15
+            });
+        });
+
+        describe('count aggregation', () => {
+            it('should correctly count items (builder API)', () => {
+                const [pipeline, getOutput] = createTestPipeline(() => 
+                    createPipeline<{ category: string; name: string }>()
+                        .groupBy(['category'], 'items')
+                        .commutativeAggregate(
+                            ['items'] as ['items'],
+                            'count',
+                            (acc: number | undefined, _item: any) => (acc ?? 0) + 1,
+                            (acc: number, _item: any) => acc - 1
+                        )
+                );
+
+                pipeline.add('item1', { category: 'A', name: 'First' });
+                pipeline.add('item2', { category: 'A', name: 'Second' });
+                pipeline.add('item3', { category: 'A', name: 'Third' });
+
+                let output = getOutput();
+                let group = output.find(g => g.category === 'A');
+                expect(group?.count).toBe(3);
+
+                pipeline.remove('item2');
+                output = getOutput();
+                group = output.find(g => g.category === 'A');
+                expect(group?.count).toBe(2);
+            });
         });
     });
 });
