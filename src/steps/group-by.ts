@@ -7,8 +7,6 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
     itemAddedHandlers: AddedHandler[] = [];
     groupRemovedHandlers: RemovedHandler[] = [];
     itemRemovedHandlers: RemovedHandler[] = [];
-    nestedAddedHandlers: Map<string, AddedHandler[]> = new Map<string, AddedHandler[]>();
-    nestedRemovedHandlers: Map<string, RemovedHandler[]> = new Map<string, RemovedHandler[]>();
 
     keyToGroupHash: Map<string, string> = new Map<string, string>();
     groupToKeys: Map<string, Set<string>> = new Map<string, Set<string>>();
@@ -76,26 +74,17 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         } else if (path.length > 1 && path[0] === this.arrayName) {
             // Handler is below this array in the tree
             const shiftedPath = path.slice(1);
-            const pathKey = shiftedPath.join(':');
             
-            // Store the handler
-            const handlers = this.nestedRemovedHandlers.get(pathKey) || [];
-            handlers.push(handler);
-            this.nestedRemovedHandlers.set(pathKey, handlers);
-            
-            // Register interceptor with input if this is the first handler for this path
-            if (handlers.length === 1) {
-                this.input.onRemoved(shiftedPath, (notifiedPath, key) => {
-                    const itemHash = notifiedPath[0];
-                    const groupHash = this.keyToGroupHash.get(itemHash);
-                    if (groupHash === undefined) {
-                        throw new Error(`GroupByStep: item with key "${itemHash}" not found when handling nested path removal notification`);
-                    }
-                    const modifiedPath = [groupHash, ...notifiedPath];
-                    const handlersForPath = this.nestedRemovedHandlers.get(pathKey) || [];
-                    handlersForPath.forEach(h => h(modifiedPath, key));
-                });
-            }
+            // Register interceptor with input
+            this.input.onRemoved(shiftedPath, (notifiedPath, key) => {
+                const itemHash = notifiedPath[0];
+                const groupHash = this.keyToGroupHash.get(itemHash);
+                if (groupHash === undefined) {
+                    throw new Error(`GroupByStep: item with key "${itemHash}" not found when handling nested path removal notification`);
+                }
+                const modifiedPath = [groupHash, ...notifiedPath];
+                handler(modifiedPath, key);
+            });
         } else {
             this.input.onRemoved(path, handler);
         }

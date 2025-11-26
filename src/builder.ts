@@ -2,7 +2,6 @@ import { getPathNamesFromDescriptor, type ImmutableProps, type Pipeline, type St
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
-import { validateArrayName } from './util/validation';
 
 // Public types (exported for use in build() signature)
 export type KeyedArray<T> = { key: string, value: T }[];
@@ -25,7 +24,6 @@ export class PipelineBuilder<TStart, T extends {}> {
         keyProperties: K[],
         arrayName: ArrayName
     ): PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>> {
-        validateArrayName(arrayName);
         const newStep = new GroupByStep<T, K, ArrayName>(this.lastStep, keyProperties, arrayName);
         return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>>(this.input, newStep);
     }

@@ -145,11 +145,5 @@ describe('pipeline groupBy', () => {
         ]);
     });
 
-    it('should throw validation error when array name contains colon', () => {
-        expect(() => {
-            createPipeline<{ category: string, value: number }>()
-                .groupBy(['category'], 'items:sub' as any);
-        }).toThrow('Array name cannot contain colon');
-    });
 });
 
