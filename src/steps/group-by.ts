@@ -89,6 +89,26 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         }
     }
 
+    onModified(path: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
+        if (path.length === 0) {
+            // The group level is immutable
+        } else if (path[0] === this.arrayName) {
+            // Shift the path by one
+            const shiftedPath = path.slice(1);
+            this.input.onModified(shiftedPath, (notifiedPath, key, name, value) => {
+                const itemHash = notifiedPath[0];
+                const groupHash = this.keyToGroupHash.get(itemHash);
+                if (groupHash === undefined) {
+                    throw new Error(`GroupByStep: item with key "${itemHash}" not found when handling nested path modification notification`);
+                }
+                const modifiedPath = [groupHash, ...notifiedPath];
+                handler(modifiedPath, key, name, value);
+            });
+        } else {
+            this.input.onModified(path, handler);
+        }
+    }
+
     private handleAdded(path: string[], key: string, immutableProps: ImmutableProps) {
         if (path.length !== 0) {
             throw new Error("GroupByStep notified of item added at a different level");

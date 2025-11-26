@@ -30,6 +30,10 @@ class InputPipeline<T> implements Pipeline<T>, Step {
             this.removedHandlers.push(handler);
         }
     }
+
+    onModified(path: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
+        // No modifications at input level
+    }
 }
 
 export function createPipeline<TStart extends {}>(): PipelineBuilder<TStart, TStart> {

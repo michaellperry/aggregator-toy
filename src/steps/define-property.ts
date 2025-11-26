@@ -16,5 +16,9 @@ export class DefinePropertyStep<T, K extends string, U> implements Step {
     onRemoved(path: string[], handler: (path: string[], key: string) => void): void {
         this.input.onRemoved(path, handler);
     }
+
+    onModified(path: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
+        this.input.onModified(path, handler);
+    }
 }
 
