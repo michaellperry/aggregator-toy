@@ -97,84 +97,28 @@ export class CommutativeAggregateStep<
     }
     
     getTypeDescriptor(): TypeDescriptor {
-        const inputDescriptor = this.input.getTypeDescriptor();
-        return this.transformDescriptor(inputDescriptor, [...this.arrayPath]);
-    }
-    
-    private transformDescriptor(
-        descriptor: TypeDescriptor, 
-        remainingPath: string[]
-    ): TypeDescriptor {
-        if (remainingPath.length === 0) {
-            return descriptor;
-        }
-        
-        const [currentArrayName, ...restPath] = remainingPath;
-        
-        if (restPath.length === 0) {
-            // This is the target array - remove it from the descriptor
-            return {
-                arrays: descriptor.arrays.filter(a => a.name !== currentArrayName)
-            };
-        }
-        
-        // Navigate deeper
-        return {
-            arrays: descriptor.arrays.map(arrayDesc => {
-                if (arrayDesc.name === currentArrayName) {
-                    return {
-                        name: arrayDesc.name,
-                        type: this.transformDescriptor(arrayDesc.type, restPath)
-                    };
-                }
-                return arrayDesc;
-            })
-        };
+        return this.input.getTypeDescriptor();
     }
     
     onAdded(pathNames: string[], handler: AddedHandler): void {
-        if (this.isParentPath(pathNames)) {
-            // Handler wants events at the parent level (where aggregate lives)
-            this.input.onAdded(pathNames, handler);
-        } else if (this.isBelowTargetArray(pathNames)) {
-            // Handler wants events below the target array
-            // Do nothing - the array no longer exists in output
-        } else {
-            // Handler wants events at unrelated path - pass through
-            this.input.onAdded(pathNames, handler);
-        }
+        this.input.onAdded(pathNames, handler);
     }
     
     onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        if (this.isParentPath(pathNames)) {
-            // Handler wants events at the parent level
-            this.input.onRemoved(pathNames, handler);
-        } else if (this.isBelowTargetArray(pathNames)) {
-            // Handler wants events below the target array
-            // Do nothing - the array no longer exists in output
-        } else {
-            // Pass through
-            this.input.onRemoved(pathNames, handler);
-        }
+        this.input.onRemoved(pathNames, handler);
     }
     
     onModified(pathNames: string[], handler: ModifiedHandler): void {
         if (this.isParentPath(pathNames)) {
             // Handler wants modification events at parent level
-            // This is the ONLY channel for receiving aggregate values
+            // This is the channel for receiving aggregate values
             this.modifiedHandlers.push({
                 pathNames,
                 handler
             });
-            
-            // Also pass through to input for other property modifications
-            this.input.onModified(pathNames, handler);
-        } else if (this.isBelowTargetArray(pathNames)) {
-            // Handler wants events below the target array
-            // Do nothing - the array no longer exists in output
-        } else {
-            this.input.onModified(pathNames, handler);
         }
+        // Always pass through to input for other property modifications
+        this.input.onModified(pathNames, handler);
     }
     
     /**
@@ -189,18 +133,6 @@ export class CommutativeAggregateStep<
         }
         
         return pathNames.every((name, i) => name === parentPath[i]);
-    }
-    
-    /**
-     * Checks if the given path is below the target array (now aggregated)
-     */
-    private isBelowTargetArray(pathNames: string[]): boolean {
-        if (pathNames.length < this.arrayPath.length) {
-            return false;
-        }
-        
-        // Check if pathNames starts with arrayPath
-        return this.arrayPath.every((name, i) => pathNames[i] === name);
     }
     
     /**

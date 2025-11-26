@@ -1,6 +1,7 @@
 import { getPathNamesFromDescriptor, type ImmutableProps, type Pipeline, type Step, type TypeDescriptor } from './pipeline';
 import { CommutativeAggregateStep, type AddOperator, type SubtractOperator } from './steps/commutative-aggregate';
 import { DefinePropertyStep } from './steps/define-property';
+import { DropArrayStep } from './steps/drop-array';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
 
@@ -57,6 +58,28 @@ type TransformWithAggregate<
                 ? Expand<Omit<T, First> & {
                     [K in First]: KeyedArray<
                         TransformWithAggregate<ItemType, Rest & string[], PropName, TAggregate>
+                    >
+                }>
+                : never
+            : never
+        : never;
+
+/**
+ * Removes an array at the specified path from the type.
+ */
+type DropArrayFromPath<
+    T,
+    Path extends string[]
+> = Path extends [infer ArrayName extends string]
+    // Single-level path: remove directly from T
+    ? Omit<T, ArrayName>
+    // Multi-level path: navigate and transform recursively
+    : Path extends [infer First extends string, ...infer Rest extends string[]]
+        ? First extends keyof T
+            ? T[First] extends KeyedArray<infer ItemType>
+                ? Expand<Omit<T, First> & {
+                    [K in First]: KeyedArray<
+                        DropArrayFromPath<ItemType, Rest & string[]>
                     >
                 }>
                 : never
@@ -135,6 +158,33 @@ export class PipelineBuilder<TStart, T extends {}> {
             { add: add as AddOperator<ImmutableProps, TAggregate>, subtract: subtract as SubtractOperator<ImmutableProps, TAggregate> }
         );
         return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, TAggregate>>(
+            this.input,
+            newStep
+        );
+    }
+
+    /**
+     * Removes an array from the output type.
+     *
+     * This step filters out the array from the type descriptor and suppresses
+     * all add/remove/modify events for paths at or below the target array.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     *
+     * @example
+     * // Remove the 'tasks' array from each employee
+     * .dropArray(['employees', 'tasks'])
+     *
+     * @example
+     * // Chain after commutativeAggregate to get aggregate-only output
+     * .commutativeAggregate(['items'], 'total', add, sub)
+     * .dropArray(['items'])
+     */
+    dropArray<TPath extends string[]>(
+        arrayPath: TPath
+    ): PipelineBuilder<TStart, DropArrayFromPath<T, TPath>> {
+        const newStep = new DropArrayStep(this.lastStep, arrayPath);
+        return new PipelineBuilder<TStart, DropArrayFromPath<T, TPath>>(
             this.input,
             newStep
         );

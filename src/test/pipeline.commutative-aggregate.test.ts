@@ -1,5 +1,6 @@
 import { createPipeline, TypeDescriptor } from '../index';
 import { CommutativeAggregateStep, AddOperator, SubtractOperator } from '../steps/commutative-aggregate';
+import { DropArrayStep } from '../steps/drop-array';
 import type { Step, ImmutableProps } from '../pipeline';
 
 // Helper type aliases for cleaner test code
@@ -706,7 +707,7 @@ describe('CommutativeAggregateStep', () => {
     });
 
     describe('TypeDescriptor transformation', () => {
-        it('should remove target array from type descriptor', () => {
+        it('should NOT remove target array from type descriptor (CommutativeAggregateStep)', () => {
             const builder = createPipeline<{ category: string; value: number }>()
                 .groupBy(['category'], 'items');
             
@@ -728,11 +729,40 @@ describe('CommutativeAggregateStep', () => {
             
             const outputDescriptor = aggregateStep.getTypeDescriptor();
             
+            // CommutativeAggregateStep should NOT remove the array (that's DropArrayStep's job)
+            expect(outputDescriptor.arrays.some(a => a.name === 'items')).toBe(true);
+        });
+
+        it('should remove target array from type descriptor when chained with DropArrayStep', () => {
+            const builder = createPipeline<{ category: string; value: number }>()
+                .groupBy(['category'], 'items');
+            
+            const step = builder['lastStep'] as Step;
+            const inputDescriptor = step.getTypeDescriptor();
+            
+            // Input should have 'items' array
+            expect(inputDescriptor.arrays.some(a => a.name === 'items')).toBe(true);
+            
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            
+            const aggregateStep = new CommutativeAggregateStep(
+                step,
+                ['items'],
+                'total',
+                { add: addOp, subtract: subtractOp }
+            );
+            
+            // Chain with DropArrayStep to remove the array
+            const dropArrayStep = new DropArrayStep(aggregateStep, ['items']);
+            
+            const outputDescriptor = dropArrayStep.getTypeDescriptor();
+            
             // Output should NOT have 'items' array
             expect(outputDescriptor.arrays.some(a => a.name === 'items')).toBe(false);
         });
 
-        it('should handle nested array path in type descriptor transformation', () => {
+        it('should handle nested array path in type descriptor transformation with DropArrayStep', () => {
             const builder = createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities');
@@ -755,7 +785,10 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const outputDescriptor = aggregateStep.getTypeDescriptor();
+            // Chain with DropArrayStep to remove the nested array
+            const dropArrayStep = new DropArrayStep(aggregateStep, ['cities', 'venues']);
+            
+            const outputDescriptor = dropArrayStep.getTypeDescriptor();
             
             // Output should still have 'cities' but without 'venues'
             expect(outputDescriptor.arrays.some(a => a.name === 'cities')).toBe(true);
