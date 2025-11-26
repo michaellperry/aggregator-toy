@@ -6,6 +6,11 @@ import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
 import { ScopedDefinePropertyStep } from './steps/scoped-define-property';
 import { NavigateToPath, TransformAtPath } from './types/path';
+import { SumAggregateStep } from './steps/sum-aggregate';
+import { CountAggregateStep } from './steps/count-aggregate';
+import { MinAggregateStep } from './steps/min-aggregate';
+import { MaxAggregateStep } from './steps/max-aggregate';
+import { AverageAggregateStep } from './steps/average-aggregate';
 
 // Public types (exported for use in build() signature)
 export type KeyedArray<T> = { key: string, value: T }[];
@@ -178,6 +183,129 @@ export class ScopedBuilder<TStart, TRoot extends {}, TScoped, Path extends strin
     }
     
     /**
+     * Sums a numeric property over items in a nested array within the scope.
+     * Handles null/undefined as 0, returns 0 for empty arrays.
+     */
+    sum<
+        ArrayName extends keyof TScoped & string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        propertyName: keyof NavigateToArrayItem<TScoped, [ArrayName]> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>> {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new SumAggregateStep(
+            this.lastStep,
+            fullPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Counts items in a nested array within the scope.
+     * Returns 0 for empty arrays.
+     */
+    count<
+        ArrayName extends keyof TScoped & string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>> {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new CountAggregateStep(
+            this.lastStep,
+            fullPath,
+            outputProperty
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number>>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Finds the minimum value of a property over items in a nested array within the scope.
+     * Returns undefined for empty arrays, ignores null/undefined values.
+     */
+    min<
+        ArrayName extends keyof TScoped & string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        propertyName: keyof NavigateToArrayItem<TScoped, [ArrayName]> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>> {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new MinAggregateStep(
+            this.lastStep,
+            fullPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Finds the maximum value of a property over items in a nested array within the scope.
+     * Returns undefined for empty arrays, ignores null/undefined values.
+     */
+    max<
+        ArrayName extends keyof TScoped & string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        propertyName: keyof NavigateToArrayItem<TScoped, [ArrayName]> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>> {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new MaxAggregateStep(
+            this.lastStep,
+            fullPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Computes the average of a numeric property over items in a nested array within the scope.
+     * Returns undefined for empty arrays, excludes null/undefined from calculation.
+     */
+    average<
+        ArrayName extends keyof TScoped & string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        propertyName: keyof NavigateToArrayItem<TScoped, [ArrayName]> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>> {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new AverageAggregateStep(
+            this.lastStep,
+            fullPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformAtPath<TRoot, Path, Expand<TScoped & Record<TPropName, number | undefined>>>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
      * Drops an array within the scope.
      * Takes just the array name - the scope provides the path prefix.
      */
@@ -293,6 +421,163 @@ export class PipelineBuilder<TStart, T extends {}> {
     ): PipelineBuilder<TStart, DropArrayFromPath<T, TPath>> {
         const newStep = new DropArrayStep(this.lastStep, arrayPath);
         return new PipelineBuilder<TStart, DropArrayFromPath<T, TPath>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Sums a numeric property over items in a nested array.
+     * Handles null/undefined as 0, returns 0 for empty arrays.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     * @param propertyName - Name of the numeric property to sum
+     * @param outputProperty - Name of the new aggregate property
+     *
+     * @example
+     * // Sum of prices across all items for each category
+     * .sum(['items'], 'price', 'totalPrice')
+     */
+    sum<
+        TPath extends string[],
+        TPropName extends string
+    >(
+        arrayPath: TPath,
+        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>> {
+        const newStep = new SumAggregateStep(
+            this.lastStep,
+            arrayPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Counts items in a nested array.
+     * Returns 0 for empty arrays.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     * @param outputProperty - Name of the new aggregate property
+     *
+     * @example
+     * // Count items for each category
+     * .count(['items'], 'itemCount')
+     */
+    count<
+        TPath extends string[],
+        TPropName extends string
+    >(
+        arrayPath: TPath,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>> {
+        const newStep = new CountAggregateStep(
+            this.lastStep,
+            arrayPath,
+            outputProperty
+        );
+        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Finds the minimum value of a property over items in a nested array.
+     * Returns undefined for empty arrays, ignores null/undefined values.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     * @param propertyName - Name of the numeric property to find minimum of
+     * @param outputProperty - Name of the new aggregate property
+     *
+     * @example
+     * // Minimum price across all items for each category
+     * .min(['items'], 'price', 'minPrice')
+     */
+    min<
+        TPath extends string[],
+        TPropName extends string
+    >(
+        arrayPath: TPath,
+        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>> {
+        const newStep = new MinAggregateStep(
+            this.lastStep,
+            arrayPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Finds the maximum value of a property over items in a nested array.
+     * Returns undefined for empty arrays, ignores null/undefined values.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     * @param propertyName - Name of the numeric property to find maximum of
+     * @param outputProperty - Name of the new aggregate property
+     *
+     * @example
+     * // Maximum price across all items for each category
+     * .max(['items'], 'price', 'maxPrice')
+     */
+    max<
+        TPath extends string[],
+        TPropName extends string
+    >(
+        arrayPath: TPath,
+        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>> {
+        const newStep = new MaxAggregateStep(
+            this.lastStep,
+            arrayPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>(
+            this.input,
+            newStep
+        );
+    }
+    
+    /**
+     * Computes the average of a numeric property over items in a nested array.
+     * Returns undefined for empty arrays, excludes null/undefined from calculation.
+     *
+     * @param arrayPath - Path of array names to navigate to the target array
+     * @param propertyName - Name of the numeric property to average
+     * @param outputProperty - Name of the new aggregate property
+     *
+     * @example
+     * // Average price across all items for each category
+     * .average(['items'], 'price', 'avgPrice')
+     */
+    average<
+        TPath extends string[],
+        TPropName extends string
+    >(
+        arrayPath: TPath,
+        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>> {
+        const newStep = new AverageAggregateStep(
+            this.lastStep,
+            arrayPath,
+            outputProperty,
+            propertyName
+        );
+        return new PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>(
             this.input,
             newStep
         );
