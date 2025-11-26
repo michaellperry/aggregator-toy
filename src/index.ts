@@ -7,6 +7,10 @@ export { createPipeline } from './factory';
 export type { AddOperator, SubtractOperator } from './steps/commutative-aggregate';
 export { CommutativeAggregateStep } from './steps/commutative-aggregate';
 
+// Aggregate steps
+export { MinMaxAggregateStep } from './steps/min-max-aggregate';
+export { AverageAggregateStep } from './steps/average-aggregate';
+
 // Drop array step
 export { DropArrayStep } from './steps/drop-array';
 
