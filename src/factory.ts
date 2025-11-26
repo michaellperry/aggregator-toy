@@ -1,6 +1,6 @@
 import type { ImmutableProps, Pipeline, Step } from './pipeline';
 import { PipelineBuilder } from './builder';
-import { getPathsFromDescriptor, type TypeDescriptor } from './pipeline';
+import { getPathNamesFromDescriptor, type TypeDescriptor } from './pipeline';
 
 // Private class (not exported)
 class InputPipeline<T> implements Pipeline<T>, Step {
@@ -11,8 +11,8 @@ class InputPipeline<T> implements Pipeline<T>, Step {
         return { arrays: [] }; // No arrays at input level
     }
 
-    getPaths(): string[][] {
-        return getPathsFromDescriptor(this.getTypeDescriptor());
+    getPathNames(): string[][] {
+        return getPathNamesFromDescriptor(this.getTypeDescriptor());
     }
 
     add(key: string, immutableProps: T): void {

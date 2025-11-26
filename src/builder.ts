@@ -1,4 +1,4 @@
-import type { Pipeline, Step, TypeDescriptor } from './pipeline';
+import type { ImmutableProps, Pipeline, Step, TypeDescriptor } from './pipeline';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
@@ -35,31 +35,55 @@ export class PipelineBuilder<TStart, T extends {}> {
     }
 
     build(setState: (transform: Transform<KeyedArray<T>>) => void): Pipeline<TStart> {
-        const paths = this.lastStep.getPaths();
+        const pathNames = this.lastStep.getPathNames();
         
         // Register handlers for each path the step will emit
-        paths.forEach(path => {
-            this.lastStep.onAdded(path, (path, key, immutableProps) => {
-                setState(state => {
-                    const existingIndex = state.findIndex(item => item.key === key);
-                    if (existingIndex >= 0) {
-                        // Update existing item
-                        const updated = [...state];
-                        updated[existingIndex] = { key, value: immutableProps as T };
-                        return updated;
-                    } else {
-                        // Add new item
-                        return [...state, { key, value: immutableProps as T }];
-                    }
-                });
+        pathNames.forEach(pathName => {
+            this.lastStep.onAdded(pathName, (path, key, immutableProps) => {
+                setState(state => addToKeyedArray(state, pathName, path, key, immutableProps) as KeyedArray<T>);
             });
             
-            this.lastStep.onRemoved(path, (path, key) => {
+            this.lastStep.onRemoved(pathName, (path, key) => {
                 setState(state => state.filter(item => item.key !== key));
             });
         });
         
         return this.input;
+    }
+}
+
+function addToKeyedArray(state: KeyedArray<any>, pathName: string[], path: string[], key: string, immutableProps: ImmutableProps): KeyedArray<any> {
+    if (pathName.length === 0) {
+        if (path.length !== 0) {
+            throw new Error("Mismatched path length when setting state");
+        }
+        return [...state, { key, value: immutableProps }];
+    }
+    else {
+        if (path.length === 0) {
+            throw new Error("Mismatched path length when setting state");
+        }
+        const key = path[0];
+        const arrayName = pathName[0];
+        const existingItemIndex = state.findIndex(item => item.key === key);
+        if (existingItemIndex < 0) {
+            throw new Error("Path references unknown item when setting state");
+        }
+        const existingItem = state[existingItemIndex];
+        const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
+        const modifiedArray = addToKeyedArray(existingArray, pathName.slice(1), path.slice(1), key, immutableProps);
+        const modifiedItem = {
+            key,
+            value: {
+                ...existingItem.value,
+                [pathName[0]]: modifiedArray
+            }
+        };
+        return [
+            ...state.slice(0, existingItemIndex),
+            modifiedItem,
+            ...state.slice(existingItemIndex+1)
+        ];
     }
 }
 

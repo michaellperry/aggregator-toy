@@ -1,5 +1,5 @@
 import type { ImmutableProps, Step } from '../pipeline';
-import { getPathsFromDescriptor, type TypeDescriptor } from '../pipeline';
+import { getPathNamesFromDescriptor, type TypeDescriptor } from '../pipeline';
 
 export class DefinePropertyStep<T, K extends string, U> implements Step {
     constructor(private input: Step, private propertyName: K, private compute: (item: T) => U) {}
@@ -8,8 +8,8 @@ export class DefinePropertyStep<T, K extends string, U> implements Step {
         return this.input.getTypeDescriptor();
     }
 
-    getPaths(): string[][] {
-        return getPathsFromDescriptor(this.getTypeDescriptor());
+    getPathNames(): string[][] {
+        return getPathNamesFromDescriptor(this.getTypeDescriptor());
     }
     
     onAdded(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {

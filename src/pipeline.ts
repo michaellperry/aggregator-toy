@@ -16,12 +16,16 @@ export type ImmutableProps = {
     [key: string]: any;
 };
 
-export function getPathsFromDescriptor(descriptor: TypeDescriptor): string[][] {
+export type OnAddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
+
+export type OnRemovedHandler = (path: string[], key: string) => void;
+
+export function getPathNamesFromDescriptor(descriptor: TypeDescriptor): string[][] {
     // Include the path to the root of the descriptor
     const paths: string[][] = [[]];
     // Recursively get paths from nested type descriptors
     for (const array of descriptor.arrays) {
-        const allChildPaths = getPathsFromDescriptor(array.type);
+        const allChildPaths = getPathNamesFromDescriptor(array.type);
         for (const childPath of allChildPaths) {
             paths.push([array.name, ...childPath]);
         }
@@ -30,9 +34,9 @@ export function getPathsFromDescriptor(descriptor: TypeDescriptor): string[][] {
 }
 
 export interface Step {
-    getPaths(): string[][];
+    getPathNames(): string[][];
     getTypeDescriptor(): TypeDescriptor;
-    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void;
-    onRemoved(path: string[], handler: (path: string[], key: string) => void): void;
+    onAdded(path: string[], handler: OnAddedHandler): void;
+    onRemoved(path: string[], handler: OnRemovedHandler): void;
 }
 
