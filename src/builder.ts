@@ -7,6 +7,9 @@ import { GroupByStep } from './steps/group-by';
 export type KeyedArray<T> = { key: string, value: T }[];
 export type Transform<T> = (state: T) => T;
 
+// Type utility to expand intersection types into a single object type for better IDE display
+type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
+
 export class PipelineBuilder<TStart, T extends {}> {
     constructor(private input: Pipeline<TStart>, private lastStep: Step) {}
 
@@ -23,9 +26,21 @@ export class PipelineBuilder<TStart, T extends {}> {
     groupBy<K extends keyof T, ArrayName extends string>(
         keyProperties: K[],
         arrayName: ArrayName
-    ): PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>> {
+    ): PipelineBuilder<TStart, Expand<{
+        [P in K]: T[P]
+    } & {
+        [P in ArrayName]: KeyedArray<{
+            [Q in Exclude<keyof T, K>]: T[Q]
+        }>
+    }>> {
         const newStep = new GroupByStep<T, K, ArrayName>(this.lastStep, keyProperties, arrayName);
-        return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>>(this.input, newStep);
+        return new PipelineBuilder<TStart, Expand<{
+            [P in K]: T[P]
+        } & {
+            [P in ArrayName]: KeyedArray<{
+                [Q in Exclude<keyof T, K>]: T[Q]
+            }>
+        }>>(this.input, newStep);
     }
 
     getTypeDescriptor(): TypeDescriptor {
