@@ -9,7 +9,7 @@ export type KeyedArray<T> = { key: string, value: T }[];
 export type Transform<T> = (state: T) => T;
 
 export class PipelineBuilder<TStart, T extends {}> {
-    constructor(private input: Pipeline<TStart>, private lastStep: Step<T>) {}
+    constructor(private input: Pipeline<TStart>, private lastStep: Step) {}
 
     defineProperty<K extends string, U>(propertyName: K, compute: (item: T) => U): PipelineBuilder<TStart, T & Record<K, U>> {
         const newStep = new DefinePropertyStep(this.lastStep, propertyName, compute);
@@ -17,7 +17,7 @@ export class PipelineBuilder<TStart, T extends {}> {
     }
 
     dropProperty<K extends keyof T>(propertyName: K): PipelineBuilder<TStart, Omit<T, K>> {
-        const newStep = new DropPropertyStep(this.lastStep, propertyName);
+        const newStep = new DropPropertyStep<T, K>(this.lastStep, propertyName);
         return new PipelineBuilder<TStart, Omit<T, K>>(this.input, newStep);
     }
 
@@ -26,7 +26,7 @@ export class PipelineBuilder<TStart, T extends {}> {
         arrayName: ArrayName
     ): PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>> {
         validateArrayName(arrayName);
-        const newStep = new GroupByStep(this.lastStep, keyProperties, arrayName);
+        const newStep = new GroupByStep<T, K, ArrayName>(this.lastStep, keyProperties, arrayName);
         return new PipelineBuilder<TStart, Pick<T, K> & Record<ArrayName, KeyedArray<Omit<T, K>>>>(this.input, newStep);
     }
 
@@ -45,11 +45,11 @@ export class PipelineBuilder<TStart, T extends {}> {
                     if (existingIndex >= 0) {
                         // Update existing item
                         const updated = [...state];
-                        updated[existingIndex] = { key, value: immutableProps };
+                        updated[existingIndex] = { key, value: immutableProps as T };
                         return updated;
                     } else {
                         // Add new item
-                        return [...state, { key, value: immutableProps }];
+                        return [...state, { key, value: immutableProps as T }];
                     }
                 });
             });

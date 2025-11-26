@@ -12,17 +12,27 @@ export interface ArrayDescriptor {
     type: TypeDescriptor;
 }
 
+export type ImmutableProps = {
+    [key: string]: any;
+};
+
 export function getPathsFromDescriptor(descriptor: TypeDescriptor): string[][] {
-    return [
-        [],  // Always have empty path for groups
-        ...descriptor.arrays.map(arr => [arr.name])  // One path per array
-    ];
+    // Include the path to the root of the descriptor
+    const paths: string[][] = [[]];
+    // Recursively get paths from nested type descriptors
+    for (const array of descriptor.arrays) {
+        const allChildPaths = getPathsFromDescriptor(array.type);
+        for (const childPath of allChildPaths) {
+            paths.push([array.name, ...childPath]);
+        }
+    }
+    return paths;
 }
 
-export interface Step<T> {
+export interface Step {
     getPaths(): string[][];
     getTypeDescriptor(): TypeDescriptor;
-    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: T) => void): void;
+    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void;
     onRemoved(path: string[], handler: (path: string[], key: string) => void): void;
 }
 

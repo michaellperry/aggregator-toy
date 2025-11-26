@@ -1,10 +1,10 @@
-import type { Pipeline, Step } from './pipeline';
+import type { ImmutableProps, Pipeline, Step } from './pipeline';
 import { PipelineBuilder } from './builder';
 import { getPathsFromDescriptor, type TypeDescriptor } from './pipeline';
 
 // Private class (not exported)
-class InputPipeline<T> implements Pipeline<T>, Step<T> {
-    private handlers: Map<string, ((path: string[], key: string, immutableProps: T) => void)[]> = new Map();
+class InputPipeline<T> implements Pipeline<T>, Step {
+    private handlers: Map<string, ((path: string[], key: string, immutableProps: ImmutableProps) => void)[]> = new Map();
     private removalHandlers: Map<string, ((path: string[], key: string) => void)[]> = new Map();
 
     getTypeDescriptor(): TypeDescriptor {
@@ -18,7 +18,7 @@ class InputPipeline<T> implements Pipeline<T>, Step<T> {
     add(key: string, immutableProps: T): void {
         const pathKey = [].join(':');
         const handlersForPath = this.handlers.get(pathKey) || [];
-        handlersForPath.forEach(handler => handler([], key, immutableProps));
+        handlersForPath.forEach(handler => handler([], key, immutableProps as ImmutableProps));
     }
 
     remove(key: string): void {
@@ -27,7 +27,7 @@ class InputPipeline<T> implements Pipeline<T>, Step<T> {
         handlersForPath.forEach(handler => handler([], key));
     }
 
-    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: T) => void): void {
+    onAdded(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
         const pathKey = path.join(':');
         const handlersForPath = this.handlers.get(pathKey) || [];
         handlersForPath.push(handler);
