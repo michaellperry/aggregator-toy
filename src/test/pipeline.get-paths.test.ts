@@ -6,7 +6,7 @@ describe('pipeline getPaths', () => {
         // Access the internal step through the builder
         const builder = pipeline as any;
         const step = builder.lastStep;
-        expect(step.getPaths()).toEqual([[]]);
+        expect(step.getPathNames()).toEqual([[]]);
     });
 
     it('should pass through paths for DefinePropertyStep', () => {
@@ -14,7 +14,7 @@ describe('pipeline getPaths', () => {
             .defineProperty('b', () => 1);
         const builder = pipeline as any;
         const step = builder.lastStep;
-        expect(step.getPaths()).toEqual([[]]);
+        expect(step.getPathNames()).toEqual([[]]);
     });
 
     it('should pass through paths for DropPropertyStep', () => {
@@ -22,7 +22,7 @@ describe('pipeline getPaths', () => {
             .dropProperty('b');
         const builder = pipeline as any;
         const step = builder.lastStep;
-        expect(step.getPaths()).toEqual([[]]);
+        expect(step.getPathNames()).toEqual([[]]);
     });
 
     it('should return [[], [arrayName]] for GroupByStep', () => {
@@ -30,7 +30,7 @@ describe('pipeline getPaths', () => {
             .groupBy(['category'], 'items');
         const builder = pipeline as any;
         const step = builder.lastStep;
-        expect(step.getPaths()).toEqual([[], ['items']]);
+        expect(step.getPathNames()).toEqual([[], ['items']]);
     });
 
     it('should pass through paths when GroupByStep is chained with other steps', () => {
@@ -41,7 +41,7 @@ describe('pipeline getPaths', () => {
         const builder = pipeline as any;
         const step = builder.lastStep;
         // DropPropertyStep should pass through the paths from GroupByStep
-        expect(step.getPaths()).toEqual([[], ['items']]);
+        expect(step.getPathNames()).toEqual([[], ['items']]);
     });
 });
 
