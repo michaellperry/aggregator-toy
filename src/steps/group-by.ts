@@ -1,14 +1,14 @@
-import type { ImmutableProps, OnAddedHandler, OnRemovedHandler, Step } from '../pipeline';
+import type { ImmutableProps, AddedHandler, RemovedHandler, Step } from '../pipeline';
 import { type TypeDescriptor } from '../pipeline';
 import { computeKeyHash } from "../util/hash";
 
 export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> implements Step {
-    groupAddedHandlers: OnAddedHandler[] = [];
-    itemAddedHandlers: OnAddedHandler[] = [];
-    groupRemovedHandlers: OnRemovedHandler[] = [];
-    itemRemovedHandlers: OnRemovedHandler[] = [];
-    nestedAddedHandlers: Map<string, OnAddedHandler[]> = new Map<string, OnAddedHandler[]>();
-    nestedRemovedHandlers: Map<string, OnRemovedHandler[]> = new Map<string, OnRemovedHandler[]>();
+    groupAddedHandlers: AddedHandler[] = [];
+    itemAddedHandlers: AddedHandler[] = [];
+    groupRemovedHandlers: RemovedHandler[] = [];
+    itemRemovedHandlers: RemovedHandler[] = [];
+    nestedAddedHandlers: Map<string, AddedHandler[]> = new Map<string, AddedHandler[]>();
+    nestedRemovedHandlers: Map<string, RemovedHandler[]> = new Map<string, RemovedHandler[]>();
 
     keyToGroupHash: Map<string, string> = new Map<string, string>();
     groupToKeys: Map<string, Set<string>> = new Map<string, Set<string>>();
@@ -40,7 +40,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         };
     }
 
-    onAdded(path: string[], handler: OnAddedHandler): void {
+    onAdded(path: string[], handler: AddedHandler): void {
         if (path.length === 0) {
             // Handler is at the group level
             this.groupAddedHandlers.push(handler);
@@ -50,31 +50,22 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         } else if (path.length > 1 && path[0] === this.arrayName) {
             // Handler is below this array in the tree
             const shiftedPath = path.slice(1);
-            const pathKey = shiftedPath.join(':');
             
-            // Store the handler
-            const handlers = this.nestedAddedHandlers.get(pathKey) || [];
-            handlers.push(handler);
-            this.nestedAddedHandlers.set(pathKey, handlers);
-            
-            // Register interceptor with input if this is the first handler for this path
-            if (handlers.length === 1) {
-                this.input.onAdded(shiftedPath, (notifiedPath, key, immutableProps) => {
-                    const groupHash = this.keyToGroupHash.get(key);
-                    if (groupHash === undefined) {
-                        throw new Error(`GroupByStep: item with key "${key}" not found when handling nested path notification`);
-                    }
-                    const modifiedPath = [groupHash, ...notifiedPath];
-                    const handlersForPath = this.nestedAddedHandlers.get(pathKey) || [];
-                    handlersForPath.forEach(h => h(modifiedPath, key, immutableProps));
-                });
-            }
+            // Register interceptor with input
+            this.input.onAdded(shiftedPath, (notifiedPath, key, immutableProps) => {
+                const groupHash = this.keyToGroupHash.get(key);
+                if (groupHash === undefined) {
+                    throw new Error(`GroupByStep: item with key "${key}" not found when handling nested path notification`);
+                }
+                const modifiedPath = [groupHash, ...notifiedPath];
+                handler(modifiedPath, key, immutableProps);
+            });
         } else {
             this.input.onAdded(path, handler);
         }
     }
 
-    onRemoved(path: string[], handler: OnRemovedHandler): void {
+    onRemoved(path: string[], handler: RemovedHandler): void {
         if (path.length === 0) {
             // Handler is at the group level
             this.groupRemovedHandlers.push(handler);

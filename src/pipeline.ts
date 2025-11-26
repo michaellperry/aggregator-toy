@@ -16,9 +16,9 @@ export type ImmutableProps = {
     [key: string]: any;
 };
 
-export type OnAddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
+export type AddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
 
-export type OnRemovedHandler = (path: string[], key: string) => void;
+export type RemovedHandler = (path: string[], key: string) => void;
 
 export function getPathNamesFromDescriptor(descriptor: TypeDescriptor): string[][] {
     // Include the path to the root of the descriptor
@@ -35,7 +35,7 @@ export function getPathNamesFromDescriptor(descriptor: TypeDescriptor): string[]
 
 export interface Step {
     getTypeDescriptor(): TypeDescriptor;
-    onAdded(path: string[], handler: OnAddedHandler): void;
-    onRemoved(path: string[], handler: OnRemovedHandler): void;
+    onAdded(path: string[], handler: AddedHandler): void;
+    onRemoved(path: string[], handler: RemovedHandler): void;
 }
 
