@@ -4,7 +4,6 @@ import { DefinePropertyStep } from './steps/define-property';
 import { DropArrayStep } from './steps/drop-array';
 import { DropPropertyStep } from './steps/drop-property';
 import { GroupByStep } from './steps/group-by';
-import { ScopedDefinePropertyStep } from './steps/scoped-define-property';
 import { NavigateToPath, TransformAtPath } from './types/path';
 import { MinMaxAggregateStep } from './steps/min-max-aggregate';
 import { AverageAggregateStep } from './steps/average-aggregate';
@@ -102,9 +101,12 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
             ? T & Record<K, U>
             : TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<K, U>>
     > {
-        const newStep = this.scopePath.length === 0
-            ? new DefinePropertyStep(this.lastStep, propertyName, compute as (item: T) => U)
-            : new ScopedDefinePropertyStep(this.lastStep, propertyName, compute as (item: unknown) => U, this.scopePath as string[]);
+        const newStep = new DefinePropertyStep(
+            this.lastStep,
+            propertyName,
+            compute as (item: unknown) => U,
+            this.scopePath as string[]
+        );
         return new PipelineBuilder(this.input, newStep) as any;
     }
 

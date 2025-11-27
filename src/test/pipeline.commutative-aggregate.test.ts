@@ -1156,7 +1156,7 @@ describe('CommutativeAggregateStep', () => {
                 const [pipeline, getOutput] = createTestPipeline(() => 
                     createPipeline<{ category: string; price: number; quantity: number }>()
                         .groupBy(['category'], 'items')
-                        .defineProperty('extendedPrice', (item: any) => item.price * item.quantity)
+                        .in('items').defineProperty('extendedPrice', (item: any) => item.price * item.quantity)
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'totalRevenue',

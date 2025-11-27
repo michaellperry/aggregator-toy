@@ -42,6 +42,44 @@ describe('pipeline defineProperty', () => {
             { a: 10, b: 20, sum: 30 }
         ]);
     });
+
+    it('should only define property at root level, not at nested levels', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number }>()
+                .groupBy(['category'], 'items')
+                .defineProperty('rootLabel' as any, (group: any) => `Root: ${group.category}`)
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10 });
+        pipeline.add("item2", { category: 'A', value: 20 });
+
+        const output = getOutput() as any[];
+        expect(output.length).toBe(1);
+        // Root level should have the property
+        expect(output[0].rootLabel).toBe('Root: A');
+        // Nested items should NOT have the property (currently bug: they do)
+        expect(output[0].items[0].rootLabel).toBeUndefined();
+        expect(output[0].items[1].rootLabel).toBeUndefined();
+    });
+
+    it('should define property at scoped level when using in()', () => {
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number }>()
+                .groupBy(['category'], 'items')
+                .in('items').defineProperty('itemLabel' as any, (item: any) => `Item: ${item.value}`)
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10 });
+        pipeline.add("item2", { category: 'A', value: 20 });
+
+        const output = getOutput() as any[];
+        expect(output.length).toBe(1);
+        // Root level should NOT have the property
+        expect(output[0].itemLabel).toBeUndefined();
+        // Nested items SHOULD have the property
+        expect(output[0].items[0].itemLabel).toBe('Item: 10');
+        expect(output[0].items[1].itemLabel).toBe('Item: 20');
+    });
 });
 
 

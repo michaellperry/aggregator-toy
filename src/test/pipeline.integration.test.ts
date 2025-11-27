@@ -6,11 +6,8 @@ describe('pipeline integration tests', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .defineProperty('groupLabel' as any, (group: any) => {
-                    // This will be called for both groups and items
-                    // Groups have category, items don't
-                    return group.category ? `Group: ${group.category}` : 'Item';
-                })
+                .defineProperty('groupLabel' as any, (group: any) => `Group: ${group.category}`)
+                .in('items').defineProperty('itemLabel' as any, (item: any) => `Item: ${item.value}`)
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -20,10 +17,10 @@ describe('pipeline integration tests', () => {
         expect(output.length).toBe(1);
         expect(output[0].category).toBe('A');
         expect(output[0].groupLabel).toBe('Group: A');
-        // Items also get the property, but with 'Item' value since they don't have category
+        // Items should NOT have groupLabel, but should have itemLabel
         expect(output[0].items).toEqual([
-            { value: 10, groupLabel: 'Item' },
-            { value: 20, groupLabel: 'Item' }
+            { value: 10, itemLabel: 'Item: 10' },
+            { value: 20, itemLabel: 'Item: 20' }
         ]);
     });
 

@@ -908,12 +908,13 @@ src/
 2. **Path Utilities in Dedicated Module**
    - Created [`src/util/path.ts`](../src/util/path.ts) with `pathsMatch()` and `pathStartsWith()`
    - These are reusable across steps and provide clear semantics for path comparison
-   - Used by both `GroupByStep` and `ScopedDefinePropertyStep`
+   - Used by `GroupByStep`, `DefinePropertyStep`, and `DropPropertyStep`
 
-3. **ScopedDefinePropertyStep for Nested defineProperty**
-   - Original `DefinePropertyStep` operates unconditionally on all items
-   - Created new [`ScopedDefinePropertyStep`](../src/steps/scoped-define-property.ts) that only transforms items at the scope path
+3. **DefinePropertyStep for Scoped defineProperty**
+   - `DefinePropertyStep` now accepts `scopePath` parameter (like `DropPropertyStep`)
    - Uses `pathsMatch()` to determine when to apply the transformation
+   - Handles both root-level (`scopePath = []`) and scoped operations
+   - Previously used separate `ScopedDefinePropertyStep` class, but this has been unified
 
 4. **GroupByStep scopePath Integration**
    - Added optional `scopePath` parameter with default `[]` for backward compatibility
@@ -928,15 +929,15 @@ src/
 
 ### 9.4 Deviations from Original Design
 
-1. **DefinePropertyStep Not Modified**
-   - **Original plan:** Modify `DefinePropertyStep` to accept `scopePath` parameter
-   - **Actual:** Created new `ScopedDefinePropertyStep` instead
-   - **Reason:** Keeps `DefinePropertyStep` simple and focused on root-level operations; scoped behavior warrants a separate class
+1. **DefinePropertyStep Unified Implementation**
+   - **Original plan:** Create separate `ScopedDefinePropertyStep` for scoped operations
+   - **Actual:** Modified `DefinePropertyStep` to accept `scopePath` parameter (matching `DropPropertyStep` pattern)
+   - **Reason:** Unified approach is cleaner and more consistent; removed `ScopedDefinePropertyStep` class
 
-2. **DropPropertyStep Not Modified**
-   - **Original plan:** Modify to accept `scopePath` parameter
-   - **Actual:** Not implemented in `ScopedBuilder`
-   - **Reason:** Not needed for the current use cases; can be added later if required
+2. **DropPropertyStep Modified**
+   - **Original plan:** Not implemented in `ScopedBuilder`
+   - **Actual:** Modified to accept `scopePath` parameter and unified with root-level behavior
+   - **Reason:** Needed for proper scoping behavior; matches the pattern used in `DefinePropertyStep`
 
 3. **CommutativeAggregateStep Not Modified**
    - **Original plan:** Modify to use `scopePath + arrayName` pattern
@@ -980,8 +981,9 @@ These types enable full compile-time type safety for scoped operations.
 - [x] Update `GroupByStep` to emit with extended runtime paths - [`src/steps/group-by.ts:196-231`](../src/steps/group-by.ts:196)
 - [x] ~~Modify `DropArrayStep` signature~~ - Not needed; ScopedBuilder constructs full path
 - [x] ~~Modify `CommutativeAggregateStep`~~ - Not needed; ScopedBuilder constructs full path
-- [x] Create `ScopedDefinePropertyStep` for scoped defineProperty - [`src/steps/scoped-define-property.ts`](../src/steps/scoped-define-property.ts)
-- [ ] Modify `DropPropertyStep` to accept `scopePath` parameter - Deferred (not needed for current use cases)
+- [x] Modify `DefinePropertyStep` to accept `scopePath` parameter - [`src/steps/define-property.ts`](../src/steps/define-property.ts)
+- [x] Modify `DropPropertyStep` to accept `scopePath` parameter - [`src/steps/drop-property.ts`](../src/steps/drop-property.ts)
+- [x] Remove `ScopedDefinePropertyStep` - Unified into `DefinePropertyStep`
 
 ### Phase 3: Builder Changes ✅
 - [x] Add `in()` method to `PipelineBuilder` - [`src/builder.ts:307-315`](../src/builder.ts:307)

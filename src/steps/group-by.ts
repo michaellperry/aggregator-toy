@@ -19,7 +19,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         private input: Step,
         private keyProperties: K[],
         private arrayName: ArrayName,
-        private scopePath: string[] = []  // Path where this groupBy operates
+        private scopePath: string[]  // Path where this groupBy operates
     ) {
         // Register with the input step to receive items at the scope path level
         this.input.onAdded(this.scopePath, (path, key, immutableProps) => {
