@@ -113,7 +113,11 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
             ? Omit<T, K>
             : TransformAtPath<T, Path, Omit<NavigateToPath<T, Path>, K>>
     > {
-        const newStep = new DropPropertyStep<NavigateToPath<T, Path>, K>(this.lastStep, propertyName);
+        const newStep = new DropPropertyStep<NavigateToPath<T, Path>, K>(
+            this.lastStep,
+            propertyName,
+            this.scopePath as string[]
+        );
         return new PipelineBuilder(this.input, newStep) as any;
     }
 

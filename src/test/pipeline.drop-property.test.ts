@@ -42,6 +42,28 @@ describe('pipeline dropProperty', () => {
             { a: 10, b: 20 }
         ]);
     });
+
+    it('should only drop property at scoped level, not at nested levels', () => {
+        // Create pipeline with property defined at both root and nested levels
+        const [pipeline, getOutput] = createTestPipeline(() => 
+            createPipeline<{ category: string, value: number }>()
+                .groupBy(['category'], 'items')
+                .defineProperty('computed' as any, (group: any) => `Group: ${group.category}`)
+                .in('items').defineProperty('computed' as any, (item: any) => `Item: ${item.value}`)
+                .in('items').dropProperty('computed' as any)  // Drop at nested level - should only drop from items, not groups
+        );
+
+        pipeline.add("item1", { category: 'A', value: 10 });
+        pipeline.add("item2", { category: 'A', value: 20 });
+
+        const output = getOutput() as any[];
+        expect(output.length).toBe(1);
+        // Root level should still have computed property (not dropped)
+        expect(output[0].computed).toBe('Group: A');
+        // Nested level should not have computed property (dropped)
+        expect(output[0].items[0].computed).toBeUndefined();
+        expect(output[0].items[1].computed).toBeUndefined();
+    });
 });
 
 

@@ -31,7 +31,7 @@ describe('pipeline integration tests', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number, extra: string }>()
                 .groupBy(['category'], 'items')
-                .dropProperty('extra' as any)
+                .in('items').dropProperty('extra' as any)
         );
 
         pipeline.add("item1", { category: 'A', value: 10, extra: 'x' });
