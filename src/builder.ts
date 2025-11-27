@@ -95,7 +95,7 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
     dropProperty<K extends keyof NavigateToPath<T, Path>>(propertyName: K): PipelineBuilder<
         Path extends []
             ? Expand<Omit<T, K>>
-            : Expand<TransformAtPath<T, Path, Omit<NavigateToPath<T, Path>, K>>>,
+            : Expand<TransformAtPath<T, Path, Expand<Omit<NavigateToPath<T, Path>, K>>>>,
         TStart
     > {
         const newStep = new DropPropertyStep<NavigateToPath<T, Path>, K>(
