@@ -13,7 +13,7 @@ type ExtractKeyedArrays<T> = T extends KeyedArray<infer U>
       }
     : T;
 
-export type BuilderOutputType<T> = T extends PipelineBuilder<any, infer U> 
+export type BuilderOutputType<T> = T extends PipelineBuilder<infer U, any> 
     ? ExtractKeyedArrays<U> 
     : never;
 
