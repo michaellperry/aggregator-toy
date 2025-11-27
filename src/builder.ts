@@ -79,8 +79,8 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
 
     defineProperty<K extends string, U>(propertyName: K, compute: (item: NavigateToPath<T, Path>) => U): PipelineBuilder<TStart,
         Path extends []
-            ? T & Record<K, U>
-            : TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<K, U>>
+            ? Expand<T & Record<K, U>>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<K, U>>>
     > {
         const newStep = new DefinePropertyStep(
             this.lastStep,
@@ -93,8 +93,8 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
 
     dropProperty<K extends keyof NavigateToPath<T, Path>>(propertyName: K): PipelineBuilder<TStart,
         Path extends []
-            ? Omit<T, K>
-            : TransformAtPath<T, Path, Omit<NavigateToPath<T, Path>, K>>
+            ? Expand<Omit<T, K>>
+            : TransformAtPath<T, Path, Expand<Omit<NavigateToPath<T, Path>, K>>>
     > {
         const newStep = new DropPropertyStep<NavigateToPath<T, Path>, K>(
             this.lastStep,
