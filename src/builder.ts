@@ -6,6 +6,7 @@ import { GroupByStep } from './steps/group-by';
 import { NavigateToPath, TransformAtPath } from './types/path';
 import { MinMaxAggregateStep } from './steps/min-max-aggregate';
 import { AverageAggregateStep } from './steps/average-aggregate';
+import { PickByMinMaxStep } from './steps/pick-by-min-max';
 
 // Public types (exported for use in build() signature)
 export type KeyedArray<T> = { key: string, value: T }[];
@@ -356,6 +357,98 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             fullPath,
             outputProperty,
             propertyName
+        );
+        return new PipelineBuilder(this.input, newStep) as any;
+    }
+    
+    /**
+     * Picks the object with the minimum value of a property from a nested array.
+     * Returns undefined for empty arrays, ignores null/undefined values.
+     * Supports both numeric and string comparisons.
+     *
+     * @param arrayName - Name of the array to pick from
+     * @param propertyName - Name of the property to minimize
+     * @param outputProperty - Name of the new property containing the picked object
+     *
+     * @example
+     * // Pick cheapest item for each category
+     * .pickByMin('items', 'price', 'cheapestItem')
+     */
+    pickByMin<
+        ArrayName extends string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        propertyName: keyof NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> | undefined>
+            : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> | undefined>>>,
+        TStart
+    > {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new PickByMinMaxStep(
+            this.lastStep,
+            fullPath,
+            outputProperty,
+            propertyName,
+            (value1, value2) => {
+                // For min: value1 < value2
+                if (typeof value1 === 'number' && typeof value2 === 'number') {
+                    return value1 < value2;
+                }
+                if (typeof value1 === 'string' && typeof value2 === 'string') {
+                    return value1 < value2;
+                }
+                return String(value1) < String(value2);
+            }
+        );
+        return new PipelineBuilder(this.input, newStep) as any;
+    }
+    
+    /**
+     * Picks the object with the maximum value of a property from a nested array.
+     * Returns undefined for empty arrays, ignores null/undefined values.
+     * Supports both numeric and string comparisons.
+     *
+     * @param arrayName - Name of the array to pick from
+     * @param propertyName - Name of the property to maximize
+     * @param outputProperty - Name of the new property containing the picked object
+     *
+     * @example
+     * // Pick most expensive item for each category
+     * .pickByMax('items', 'price', 'mostExpensiveItem')
+     */
+    pickByMax<
+        ArrayName extends string,
+        TPropName extends string
+    >(
+        arrayName: ArrayName,
+        propertyName: keyof NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> & string,
+        outputProperty: TPropName
+    ): PipelineBuilder<
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> | undefined>
+            : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> | undefined>>>,
+        TStart
+    > {
+        const fullPath = [...this.scopePath, arrayName];
+        const newStep = new PickByMinMaxStep(
+            this.lastStep,
+            fullPath,
+            outputProperty,
+            propertyName,
+            (value1, value2) => {
+                // For max: value1 > value2
+                if (typeof value1 === 'number' && typeof value2 === 'number') {
+                    return value1 > value2;
+                }
+                if (typeof value1 === 'string' && typeof value2 === 'string') {
+                    return value1 > value2;
+                }
+                return String(value1) > String(value2);
+            }
         );
         return new PipelineBuilder(this.input, newStep) as any;
     }
