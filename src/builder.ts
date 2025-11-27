@@ -146,34 +146,31 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
      * The aggregate is computed incrementally as items are added or removed.
      * The target array is replaced with the aggregate property in the output type.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
+     * @param arrayName - Name of the array to aggregate
      * @param propertyName - Name of the new aggregate property
      * @param add - Operator called when an item is added
      * @param subtract - Operator called when an item is removed
      *
      * @example
-     * // Sum of hours across all tasks for each employee
+     * // Sum of values across all items for each category
      * .commutativeAggregate(
-     *     ['employees', 'tasks'],
-     *     'totalHours',
-     *     (acc, task) => (acc ?? 0) + task.hours,
-     *     (acc, task) => acc - task.hours
+     *     'items',
+     *     'total',
+     *     (acc, item) => (acc ?? 0) + item.value,
+     *     (acc, item) => acc - item.value
+     * )
+     *
+     * @example
+     * // Sum of capacity across all venues within cities (using in() for path prefix)
+     * .in('cities').commutativeAggregate(
+     *     'venues',
+     *     'totalCapacity',
+     *     (acc, venue) => (acc ?? 0) + venue.capacity,
+     *     (acc, venue) => acc - venue.capacity
      * )
      */
-    // Root-level overload (Path is [])
     commutativeAggregate<
-        TPath extends string[],
-        TPropName extends string,
-        TAggregate
-    >(
-        arrayPath: TPath,
-        propertyName: TPropName,
-        add: AddOperator<NavigateToArrayItem<T, TPath>, TAggregate>,
-        subtract: SubtractOperator<NavigateToArrayItem<T, TPath>, TAggregate>
-    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, TAggregate>>;
-    // Scoped-level overload (Path is non-empty)
-    commutativeAggregate<
-        ArrayName extends keyof NavigateToPath<T, Path> & string,
+        ArrayName extends string,
         PropName extends string,
         TAggregate
     >(
@@ -181,17 +178,12 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
         propertyName: PropName,
         add: AddOperator<NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]>, TAggregate>,
         subtract: SubtractOperator<NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]>, TAggregate>
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<PropName, TAggregate>>>>;
-    // Implementation
-    commutativeAggregate(
-        arrayPathOrName: any,
-        propertyName: any,
-        add: any,
-        subtract: any
-    ): any {
-        const fullPath = this.scopePath.length === 0
-            ? arrayPathOrName
-            : [...this.scopePath, arrayPathOrName];
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], PropName, TAggregate>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<PropName, TAggregate>>>
+    > {
+        const fullPath = [...this.scopePath, arrayName];
         const newStep = new CommutativeAggregateStep(
             this.lastStep,
             fullPath,
@@ -201,7 +193,7 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
                 subtract: subtract as SubtractOperator<ImmutableProps, any> 
             }
         );
-        return new PipelineBuilder(this.input, newStep);
+        return new PipelineBuilder(this.input, newStep) as any;
     }
 
     /**
@@ -210,70 +202,59 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
      * This step filters out the array from the type descriptor and suppresses
      * all add/remove/modify events for paths at or below the target array.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
-     * @param arrayName - Name of the array to drop (scoped level)
+     * @param arrayName - Name of the array to drop
      *
      * @example
-     * // Remove the 'tasks' array from each employee
-     * .dropArray(['employees', 'tasks'])
+     * // Remove the 'items' array at root level
+     * .dropArray('items')
+     *
+     * @example
+     * // Remove the 'venues' array within cities (using in() for path prefix)
+     * .in('cities').dropArray('venues')
      *
      * @example
      * // Chain after commutativeAggregate to get aggregate-only output
-     * .commutativeAggregate(['items'], 'total', add, sub)
-     * .dropArray(['items'])
+     * .commutativeAggregate('items', 'total', add, sub)
+     * .dropArray('items')
      */
-    // Root-level overload (Path is [])
-    dropArray<TPath extends string[]>(
-        arrayPath: TPath
-    ): PipelineBuilder<TStart, DropArrayFromPath<T, TPath>>;
-    // Scoped-level overload (Path is non-empty)
-    dropArray<ArrayName extends keyof NavigateToPath<T, Path> & string>(
+    dropArray<ArrayName extends string>(
         arrayName: ArrayName
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Omit<NavigateToPath<T, Path>, ArrayName>>>;
-    // Implementation
-    dropArray(arrayPathOrName: any): any {
-        const fullPath = this.scopePath.length === 0
-            ? arrayPathOrName
-            : [...this.scopePath, arrayPathOrName];
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? DropArrayFromPath<T, [ArrayName]>
+            : TransformAtPath<T, Path, Omit<NavigateToPath<T, Path>, ArrayName>>
+    > {
+        const fullPath = [...this.scopePath, arrayName];
         const newStep = new DropArrayStep(this.lastStep, fullPath);
-        return new PipelineBuilder(this.input, newStep);
+        return new PipelineBuilder(this.input, newStep) as any;
     }
     
     /**
      * Sums a numeric property over items in a nested array.
      * Handles null/undefined as 0, returns 0 for empty arrays.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
-     * @param arrayName - Name of the array to sum (scoped level)
+     * @param arrayName - Name of the array to sum
      * @param propertyName - Name of the numeric property to sum
      * @param outputProperty - Name of the new aggregate property
      *
      * @example
      * // Sum of prices across all items for each category
-     * .sum(['items'], 'price', 'totalPrice')
+     * .sum('items', 'price', 'totalPrice')
      */
-    // Root-level overload (Path is [])
     sum<
-        TPath extends string[],
-        TPropName extends string
-    >(
-        arrayPath: TPath,
-        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
-        outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>>;
-    // Scoped-level overload (Path is non-empty)
-    sum<
-        ArrayName extends keyof NavigateToPath<T, Path> & string,
+        ArrayName extends string,
         TPropName extends string
     >(
         arrayName: ArrayName,
         propertyName: keyof NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> & string,
         outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number>>>>;
-    // Implementation
-    sum(arrayPathOrName: any, propertyName: any, outputProperty: any): any {
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, number>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number>>>
+    > {
         return this.commutativeAggregate(
-            arrayPathOrName,
+            arrayName,
             outputProperty,
             (acc: number | undefined, item: any) => {
                 const value = (item as any)[propertyName];
@@ -292,34 +273,26 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
      * Counts items in a nested array.
      * Returns 0 for empty arrays.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
-     * @param arrayName - Name of the array to count (scoped level)
+     * @param arrayName - Name of the array to count
      * @param outputProperty - Name of the new aggregate property
      *
      * @example
      * // Count items for each category
-     * .count(['items'], 'itemCount')
+     * .count('items', 'itemCount')
      */
-    // Root-level overload (Path is [])
     count<
-        TPath extends string[],
-        TPropName extends string
-    >(
-        arrayPath: TPath,
-        outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number>>;
-    // Scoped-level overload (Path is non-empty)
-    count<
-        ArrayName extends keyof NavigateToPath<T, Path> & string,
+        ArrayName extends string,
         TPropName extends string
     >(
         arrayName: ArrayName,
         outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number>>>>;
-    // Implementation
-    count(arrayPathOrName: any, outputProperty: any): any {
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, number>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number>>>
+    > {
         return this.commutativeAggregate(
-            arrayPathOrName,
+            arrayName,
             outputProperty,
             (acc: number | undefined, _item: any) => (acc ?? 0) + 1,
             (acc: number, _item: any) => acc - 1
@@ -330,38 +303,27 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
      * Finds the minimum value of a property over items in a nested array.
      * Returns undefined for empty arrays, ignores null/undefined values.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
-     * @param arrayName - Name of the array to find minimum in (scoped level)
+     * @param arrayName - Name of the array to find minimum in
      * @param propertyName - Name of the numeric property to find minimum of
      * @param outputProperty - Name of the new aggregate property
      *
      * @example
      * // Minimum price across all items for each category
-     * .min(['items'], 'price', 'minPrice')
+     * .min('items', 'price', 'minPrice')
      */
-    // Root-level overload (Path is [])
     min<
-        TPath extends string[],
-        TPropName extends string
-    >(
-        arrayPath: TPath,
-        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
-        outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>;
-    // Scoped-level overload (Path is non-empty)
-    min<
-        ArrayName extends keyof NavigateToPath<T, Path> & string,
+        ArrayName extends string,
         TPropName extends string
     >(
         arrayName: ArrayName,
         propertyName: keyof NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> & string,
         outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>>;
-    // Implementation
-    min(arrayPathOrName: any, propertyName: any, outputProperty: any): any {
-        const fullPath = this.scopePath.length === 0
-            ? arrayPathOrName
-            : [...this.scopePath, arrayPathOrName];
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, number | undefined>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>
+    > {
+        const fullPath = [...this.scopePath, arrayName];
         const newStep = new MinMaxAggregateStep(
             this.lastStep,
             fullPath,
@@ -369,45 +331,34 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
             propertyName,
             (values) => Math.min(...values)
         );
-        return new PipelineBuilder(this.input, newStep);
+        return new PipelineBuilder(this.input, newStep) as any;
     }
     
     /**
      * Finds the maximum value of a property over items in a nested array.
      * Returns undefined for empty arrays, ignores null/undefined values.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
-     * @param arrayName - Name of the array to find maximum in (scoped level)
+     * @param arrayName - Name of the array to find maximum in
      * @param propertyName - Name of the numeric property to find maximum of
      * @param outputProperty - Name of the new aggregate property
      *
      * @example
      * // Maximum price across all items for each category
-     * .max(['items'], 'price', 'maxPrice')
+     * .max('items', 'price', 'maxPrice')
      */
-    // Root-level overload (Path is [])
     max<
-        TPath extends string[],
-        TPropName extends string
-    >(
-        arrayPath: TPath,
-        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
-        outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>;
-    // Scoped-level overload (Path is non-empty)
-    max<
-        ArrayName extends keyof NavigateToPath<T, Path> & string,
+        ArrayName extends string,
         TPropName extends string
     >(
         arrayName: ArrayName,
         propertyName: keyof NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> & string,
         outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>>;
-    // Implementation
-    max(arrayPathOrName: any, propertyName: any, outputProperty: any): any {
-        const fullPath = this.scopePath.length === 0
-            ? arrayPathOrName
-            : [...this.scopePath, arrayPathOrName];
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, number | undefined>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>
+    > {
+        const fullPath = [...this.scopePath, arrayName];
         const newStep = new MinMaxAggregateStep(
             this.lastStep,
             fullPath,
@@ -415,52 +366,41 @@ export class PipelineBuilder<TStart, T extends {}, Path extends string[] = []> {
             propertyName,
             (values) => Math.max(...values)
         );
-        return new PipelineBuilder(this.input, newStep);
+        return new PipelineBuilder(this.input, newStep) as any;
     }
     
     /**
      * Computes the average of a numeric property over items in a nested array.
      * Returns undefined for empty arrays, excludes null/undefined from calculation.
      *
-     * @param arrayPath - Path of array names to navigate to the target array (root level)
-     * @param arrayName - Name of the array to average (scoped level)
+     * @param arrayName - Name of the array to average
      * @param propertyName - Name of the numeric property to average
      * @param outputProperty - Name of the new aggregate property
      *
      * @example
      * // Average price across all items for each category
-     * .average(['items'], 'price', 'avgPrice')
+     * .average('items', 'price', 'avgPrice')
      */
-    // Root-level overload (Path is [])
     average<
-        TPath extends string[],
-        TPropName extends string
-    >(
-        arrayPath: TPath,
-        propertyName: keyof NavigateToArrayItem<T, TPath> & string,
-        outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformWithAggregate<T, TPath, TPropName, number | undefined>>;
-    // Scoped-level overload (Path is non-empty)
-    average<
-        ArrayName extends keyof NavigateToPath<T, Path> & string,
+        ArrayName extends string,
         TPropName extends string
     >(
         arrayName: ArrayName,
         propertyName: keyof NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> & string,
         outputProperty: TPropName
-    ): PipelineBuilder<TStart, TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>>;
-    // Implementation
-    average(arrayPathOrName: any, propertyName: any, outputProperty: any): any {
-        const fullPath = this.scopePath.length === 0
-            ? arrayPathOrName
-            : [...this.scopePath, arrayPathOrName];
+    ): PipelineBuilder<TStart,
+        Path extends []
+            ? TransformWithAggregate<T, [ArrayName], TPropName, number | undefined>
+            : TransformAtPath<T, Path, Expand<NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>
+    > {
+        const fullPath = [...this.scopePath, arrayName];
         const newStep = new AverageAggregateStep(
             this.lastStep,
             fullPath,
             outputProperty,
             propertyName
         );
-        return new PipelineBuilder(this.input, newStep);
+        return new PipelineBuilder(this.input, newStep) as any;
     }
     
     /**

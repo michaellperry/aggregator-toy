@@ -7,7 +7,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; itemName: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .sum(['items'] as ['items'], 'price', 'totalPrice')
+                    .sum('items', 'price', 'totalPrice')
             );
 
             pipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
@@ -22,7 +22,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number | null | undefined }>()
                     .groupBy(['category'], 'items')
-                    .sum(['items'] as ['items'], 'price', 'totalPrice')
+                    .sum('items', 'price', 'totalPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -39,7 +39,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .sum(['items'] as ['items'], 'price', 'totalPrice')
+                    .sum('items', 'price', 'totalPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -71,7 +71,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .sum(['items'] as ['items'], 'price', 'totalPrice')
+                    .sum('items', 'price', 'totalPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -95,7 +95,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; itemName: string }>()
                     .groupBy(['category'], 'items')
-                    .count(['items'] as ['items'], 'itemCount')
+                    .count('items', 'itemCount')
             );
 
             pipeline.add('item1', { category: 'Electronics', itemName: 'Phone' });
@@ -111,7 +111,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; itemName: string }>()
                     .groupBy(['category'], 'items')
-                    .count(['items'] as ['items'], 'itemCount')
+                    .count('items', 'itemCount')
             );
 
             pipeline.add('item1', { category: 'A', itemName: 'Item' });
@@ -125,7 +125,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; itemName: string }>()
                     .groupBy(['category'], 'items')
-                    .count(['items'] as ['items'], 'itemCount')
+                    .count('items', 'itemCount')
             );
 
             pipeline.add('item1', { category: 'A', itemName: 'Item1' });
@@ -171,7 +171,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .min(['items'] as ['items'], 'price', 'minPrice')
+                    .min('items', 'price', 'minPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -187,7 +187,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .min(['items'] as ['items'], 'price', 'minPrice')
+                    .min('items', 'price', 'minPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -201,7 +201,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number | null | undefined }>()
                     .groupBy(['category'], 'items')
-                    .min(['items'] as ['items'], 'price', 'minPrice')
+                    .min('items', 'price', 'minPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: null });
@@ -218,7 +218,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .min(['items'] as ['items'], 'price', 'minPrice')
+                    .min('items', 'price', 'minPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -260,7 +260,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .max(['items'] as ['items'], 'price', 'maxPrice')
+                    .max('items', 'price', 'maxPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -276,7 +276,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .max(['items'] as ['items'], 'price', 'maxPrice')
+                    .max('items', 'price', 'maxPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -290,7 +290,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number | null | undefined }>()
                     .groupBy(['category'], 'items')
-                    .max(['items'] as ['items'], 'price', 'maxPrice')
+                    .max('items', 'price', 'maxPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: null });
@@ -307,7 +307,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .max(['items'] as ['items'], 'price', 'maxPrice')
+                    .max('items', 'price', 'maxPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -349,7 +349,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .average(['items'] as ['items'], 'price', 'avgPrice')
+                    .average('items', 'price', 'avgPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -365,7 +365,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .average(['items'] as ['items'], 'price', 'avgPrice')
+                    .average('items', 'price', 'avgPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -379,7 +379,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .average(['items'] as ['items'], 'price', 'avgPrice')
+                    .average('items', 'price', 'avgPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -402,7 +402,7 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number | null | undefined }>()
                     .groupBy(['category'], 'items')
-                    .average(['items'] as ['items'], 'price', 'avgPrice')
+                    .average('items', 'price', 'avgPrice')
             );
 
             pipeline.add('item1', { category: 'A', price: null });
@@ -439,8 +439,8 @@ describe('Aggregate Functions', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
-                    .sum(['items'] as ['items'], 'price', 'totalPrice')
-                    .dropArray(['items'] as ['items'])
+                    .sum('items', 'price', 'totalPrice')
+                    .dropArray('items')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
@@ -457,7 +457,7 @@ describe('Aggregate Functions', () => {
                 createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
                     .groupBy(['state', 'city'], 'venues')
                     .groupBy(['state'], 'cities')
-                    .sum(['cities', 'venues'] as ['cities', 'venues'], 'capacity', 'totalCapacity')
+                    .in('cities').sum('venues', 'capacity', 'totalCapacity')
             );
 
             pipeline.add('v1', { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });

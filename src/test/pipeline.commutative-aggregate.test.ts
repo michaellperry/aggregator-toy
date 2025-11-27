@@ -845,7 +845,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; itemName: string; price: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'totalPrice',
                             (acc: number | undefined, item) => (acc ?? 0) + item.price,
                             (acc: number, item) => acc - item.price
@@ -865,7 +865,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; itemName: string; price: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'totalPrice',
                             (acc: number | undefined, item) => (acc ?? 0) + item.price,
                             (acc: number, item) => acc - item.price
@@ -889,7 +889,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; itemName: string; price: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'totalPrice',
                             (acc: number | undefined, item) => (acc ?? 0) + item.price,
                             (acc: number, item) => acc - item.price
@@ -915,7 +915,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; price: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'total',
                             (acc: number | undefined, item) => (acc ?? 0) + item.price,
                             (acc: number, item) => acc - item.price
@@ -940,7 +940,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; itemName: string; price: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'totalPrice',
                             (acc: number | undefined, item) => (acc ?? 0) + item.price,
                             (acc: number, item) => acc - item.price
@@ -965,7 +965,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ department: string; employee: string; salary: number }>()
                         .groupBy(['department'], 'employees')
                         .commutativeAggregate(
-                            ['employees'] as ['employees'],
+                            'employees',
                             'totalSalary',
                             (acc: number | undefined, item) => (acc ?? 0) + item.salary,
                             (acc: number, item) => acc - item.salary
@@ -998,8 +998,8 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
                         .groupBy(['state', 'city'], 'venues')
                         .groupBy(['state'], 'cities')
-                        .commutativeAggregate(
-                            ['cities', 'venues'] as ['cities', 'venues'],
+                        .in('cities').commutativeAggregate(
+                            'venues',
                             'totalCapacity',
                             (acc: number | undefined, item) => (acc ?? 0) + item.capacity,
                             (acc: number, item) => acc - item.capacity
@@ -1021,8 +1021,8 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
                         .groupBy(['state', 'city'], 'venues')
                         .groupBy(['state'], 'cities')
-                        .commutativeAggregate(
-                            ['cities', 'venues'] as ['cities', 'venues'],
+                        .in('cities').commutativeAggregate(
+                            'venues',
                             'venueCount',
                             (acc: number | undefined, _item) => (acc ?? 0) + 1,
                             (acc: number, _item) => acc - 1
@@ -1049,7 +1049,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; value: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'total',
                             (acc: number | undefined, item) => (acc ?? 0) + item.value,
                             (acc: number, item) => acc - item.value
@@ -1070,7 +1070,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; value: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'total',
                             (acc: number | undefined, item) => (acc ?? 0) + item.value,
                             (acc: number, item) => acc - item.value
@@ -1095,7 +1095,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; value: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'total',
                             (acc: number | undefined, item) => (acc ?? 0) + item.value,
                             (acc: number, item) => acc - item.value
@@ -1120,12 +1120,12 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; value: number }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'total',
                             (acc: number | undefined, item) => (acc ?? 0) + item.value,
                             (acc: number, item) => acc - item.value
                         )
-                        .dropArray(['items'] as ['items'])
+                        .dropArray('items')
                 );
 
                 pipeline.add('item1', { category: 'A', value: 10 });
@@ -1158,7 +1158,7 @@ describe('CommutativeAggregateStep', () => {
                         .groupBy(['category'], 'items')
                         .in('items').defineProperty('extendedPrice', (item) => item.price * item.quantity)
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'totalRevenue',
                             (acc: number | undefined, item) => (acc ?? 0) + item.extendedPrice,
                             (acc: number, item) => acc - item.extendedPrice
@@ -1180,7 +1180,7 @@ describe('CommutativeAggregateStep', () => {
                     createPipeline<{ category: string; name: string }>()
                         .groupBy(['category'], 'items')
                         .commutativeAggregate(
-                            ['items'] as ['items'],
+                            'items',
                             'count',
                             (acc: number | undefined, _item) => (acc ?? 0) + 1,
                             (acc: number, _item) => acc - 1

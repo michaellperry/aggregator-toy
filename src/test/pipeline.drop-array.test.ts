@@ -6,7 +6,7 @@ describe('pipeline dropArray', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -64,7 +64,7 @@ describe('pipeline dropArray', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -93,7 +93,7 @@ describe('pipeline dropArray', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         // Don't add any items - array should be empty
@@ -109,7 +109,7 @@ describe('pipeline dropArray event suppression', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         // Add items after dropping - item-level events should be suppressed
@@ -151,7 +151,7 @@ describe('pipeline dropArray event suppression', () => {
         const [pipeline2, getOutput2] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
         
         // Add items after dropping
@@ -184,7 +184,7 @@ describe('pipeline dropArray event suppression', () => {
         const [pipeline2, getOutput2] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
         
         // Add items - these won't appear because add events are suppressed
@@ -209,7 +209,7 @@ describe('pipeline dropArray event suppression', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .in('items').defineProperty('doubled', (item) => item.value * 2)
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         // Add items - add events are suppressed, so items won't be added
@@ -236,7 +236,7 @@ describe('pipeline dropArray event suppression', () => {
             createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .dropArray(['cities', 'venues'] as ['cities', 'venues'])
+                .in('cities').dropArray('venues')
         );
 
         // Add items at cities level (parent of dropped path) - should work
@@ -273,7 +273,7 @@ describe('pipeline dropArray integration', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -301,12 +301,12 @@ describe('pipeline dropArray integration', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .commutativeAggregate(
-                    ['items'] as ['items'],
+                    'items',
                     'total',
                     (acc: number | undefined, item) => (acc ?? 0) + item.value,
                     (acc: number, item) => acc - item.value
                 )
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         // Add items
@@ -344,7 +344,7 @@ describe('pipeline dropArray integration', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -371,7 +371,7 @@ describe('pipeline dropArray integration', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
                 .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
         );
 
@@ -400,7 +400,7 @@ describe('pipeline dropArray integration', () => {
             createPipeline<{ category: string, value: number, extra: string }>()
                 .groupBy(['category'], 'items')
                 .dropProperty('extra' as any)
-                .dropArray(['items'] as ['items'])
+                .dropArray('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10, extra: 'x' });
@@ -431,7 +431,7 @@ describe('pipeline dropArray nested scenarios', () => {
             createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .dropArray(['cities', 'venues'] as ['cities', 'venues'])
+                .in('cities').dropArray('venues')
         );
 
         pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Venue1', capacity: 100 });
@@ -465,7 +465,7 @@ describe('pipeline dropArray nested scenarios', () => {
                 .groupBy(['state', 'city', 'town'], 'buildings')
                 .groupBy(['state', 'city'], 'towns')
                 .groupBy(['state'], 'cities')
-                .dropArray(['cities', 'towns', 'buildings'] as ['cities', 'towns', 'buildings'])
+                .in('cities', 'towns').dropArray('buildings')
         );
 
         pipeline.add("b1", { state: 'TX', city: 'Dallas', town: 'Plano', building: 'Tower', floors: 10 });
@@ -497,7 +497,7 @@ describe('pipeline dropArray nested scenarios', () => {
             createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .dropArray(['cities', 'venues'] as ['cities', 'venues'])
+                .in('cities').dropArray('venues')
         );
 
         // Add items at the dropped path level - events should be suppressed
@@ -524,7 +524,7 @@ describe('pipeline dropArray nested scenarios', () => {
                 .groupBy(['state', 'city', 'venue'], 'staff')
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .dropArray(['cities', 'venues'] as ['cities', 'venues'])
+                .in('cities').dropArray('venues')
         );
 
         // Add items at the dropped path and below it
@@ -550,8 +550,8 @@ describe('pipeline dropArray nested scenarios', () => {
                 .groupBy(['state', 'city', 'venue'], 'staff')
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .dropArray(['cities', 'venues'] as ['cities', 'venues'])
-                .dropArray(['cities', 'venues', 'staff'] as ['cities', 'venues', 'staff'])
+                .in('cities').dropArray('venues')
+                .in('cities', 'venues').dropArray('staff')
         );
 
         pipeline.add("staff1", { state: 'TX', city: 'Dallas', venue: 'Venue1', staff: 'John', role: 'Manager' });
