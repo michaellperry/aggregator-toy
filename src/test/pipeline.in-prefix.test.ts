@@ -36,8 +36,8 @@ describe('pipeline in() path prefix', () => {
             // Should have two city groups within the state
             expect(output[0].cities).toHaveLength(2);
             
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
-            const houstonCity = output[0].cities.find((c: any) => c.city === 'Houston');
+            const dallasCity = output[0].cities.find(c => c.city === 'Dallas');
+            const houstonCity = output[0].cities.find(c => c.city === 'Houston');
             
             expect(dallasCity).toBeDefined();
             expect(dallasCity?.venues).toHaveLength(2);
@@ -134,14 +134,14 @@ describe('pipeline in() path prefix', () => {
             // Should have two states
             expect(output[0].states).toHaveLength(2);
             
-            const txState = output[0].states.find((s: any) => s.state === 'TX');
+            const txState = output[0].states.find(s => s.state === 'TX');
             expect(txState).toBeDefined();
             expect(txState?.cities).toHaveLength(2);
             
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = txState?.cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.venues).toHaveLength(2);
             
-            const houstonCity = txState?.cities.find((c: any) => c.city === 'Houston');
+            const houstonCity = txState?.cities.find(c => c.city === 'Houston');
             expect(houstonCity?.venues).toHaveLength(1);
         });
 
@@ -173,7 +173,7 @@ describe('pipeline in() path prefix', () => {
                 createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                     .groupBy(['state'], 'cities')
                     .in('cities').groupBy(['city'], 'venues')
-                    .in('cities', 'venues').defineProperty('isLarge', (v: any) => v.capacity > 25000)
+                    .in('cities', 'venues').defineProperty('isLarge', (v) => v.capacity > 25000)
             );
 
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
@@ -201,7 +201,7 @@ describe('pipeline in() path prefix', () => {
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
             pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
 
-            const output = getOutput() as any[];
+            const output = getOutput() as Array<{ state: string; cities: Array<{ city: string; venues?: unknown }> }>;
             
             // State should exist
             expect(output.length).toBe(1);
@@ -212,7 +212,7 @@ describe('pipeline in() path prefix', () => {
             expect(output[0].cities.length).toBeGreaterThan(0);
             
             // But venues array should be dropped
-            output[0].cities.forEach((city: any) => {
+            output[0].cities.forEach((city) => {
                 expect(city.venues).toBeUndefined();
                 expect(city.city).toBeDefined(); // city property should remain
             });
@@ -226,8 +226,8 @@ describe('pipeline in() path prefix', () => {
                     .in('cities').commutativeAggregate(
                         'venues',
                         'totalCapacity',
-                        (acc: number | undefined, v: any) => (acc ?? 0) + v.capacity,
-                        (acc: number, v: any) => acc - v.capacity
+                        (acc: number | undefined, v) => (acc ?? 0) + v.capacity,
+                        (acc: number, v) => acc - v.capacity
                     )
                     .in('cities').dropArray('venues')
             );
@@ -235,9 +235,9 @@ describe('pipeline in() path prefix', () => {
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
             pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
 
-            const output = getOutput() as any[];
+            const output = getOutput() as Array<{ state: string; cities: Array<{ city: string; totalCapacity: number; venues?: unknown }> }>;
             
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = output[0].cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(70000);
             expect(dallasCity?.venues).toBeUndefined();
         });
@@ -253,8 +253,8 @@ describe('pipeline in() path prefix', () => {
                     .in('cities').commutativeAggregate(
                         'venues',  // Just the array name, scope provides the prefix
                         'venueCount',
-                        (acc: number | undefined, _: any) => (acc ?? 0) + 1,
-                        (acc: number, _: any) => acc - 1
+                        (acc: number | undefined, _) => (acc ?? 0) + 1,
+                        (acc: number, _) => acc - 1
                     )
             );
 
@@ -262,10 +262,10 @@ describe('pipeline in() path prefix', () => {
             pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
             pipeline.add("venue3", { state: 'TX', city: 'Houston', venue: 'Center', capacity: 30000 });
 
-            const output = getOutput() as any[];
+            const output = getOutput() as Array<{ state: string; cities: Array<{ city: string; venueCount: number }> }>;
             
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
-            const houstonCity = output[0].cities.find((c: any) => c.city === 'Houston');
+            const dallasCity = output[0].cities.find(c => c.city === 'Dallas');
+            const houstonCity = output[0].cities.find(c => c.city === 'Houston');
             
             expect(dallasCity?.venueCount).toBe(2);
             expect(houstonCity?.venueCount).toBe(1);
@@ -279,23 +279,23 @@ describe('pipeline in() path prefix', () => {
                     .in('cities').commutativeAggregate(
                         'venues',
                         'totalCapacity',
-                        (acc: number | undefined, v: any) => (acc ?? 0) + v.capacity,
-                        (acc: number, v: any) => acc - v.capacity
+                        (acc: number | undefined, v) => (acc ?? 0) + v.capacity,
+                        (acc: number, v) => acc - v.capacity
                     )
             );
 
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
             pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
 
-            let output = getOutput() as any[];
-            let dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            let output = getOutput() as Array<{ state: string; cities: Array<{ city: string; totalCapacity: number }> }>;
+            let dallasCity = output[0].cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(70000);
 
             // Remove one venue
             pipeline.remove("venue1");
 
-            output = getOutput() as any[];
-            dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            output = getOutput() as Array<{ state: string; cities: Array<{ city: string; totalCapacity: number }> }>;
+            dallasCity = output[0].cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(20000);
         });
 
@@ -307,8 +307,8 @@ describe('pipeline in() path prefix', () => {
                     .in('cities').commutativeAggregate(
                         'venues',
                         'totalCapacity',
-                        (acc: number | undefined, v: any) => (acc ?? 0) + v.capacity,
-                        (acc: number, v: any) => acc - v.capacity
+                        (acc: number | undefined, v) => (acc ?? 0) + v.capacity,
+                        (acc: number, v) => acc - v.capacity
                     )
             );
 
@@ -316,10 +316,10 @@ describe('pipeline in() path prefix', () => {
             pipeline.add("venue2", { state: 'TX', city: 'Houston', venue: 'Center', capacity: 30000 });
             pipeline.add("venue3", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
 
-            const output = getOutput() as any[];
+            const output = getOutput() as Array<{ state: string; cities: Array<{ city: string; totalCapacity: number }> }>;
             
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
-            const houstonCity = output[0].cities.find((c: any) => c.city === 'Houston');
+            const dallasCity = output[0].cities.find(c => c.city === 'Dallas');
+            const houstonCity = output[0].cities.find(c => c.city === 'Houston');
             
             // Each city should have its own independent aggregate
             expect(dallasCity?.totalCapacity).toBe(70000); // 50000 + 20000
@@ -335,17 +335,17 @@ describe('pipeline in() path prefix', () => {
                     .in('states', 'cities').commutativeAggregate(
                         'venues',
                         'totalCapacity',
-                        (acc: number | undefined, v: any) => (acc ?? 0) + v.capacity,
-                        (acc: number, v: any) => acc - v.capacity
+                        (acc: number | undefined, v) => (acc ?? 0) + v.capacity,
+                        (acc: number, v) => acc - v.capacity
                     )
             );
 
             pipeline.add("venue1", { region: 'Southwest', state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
             pipeline.add("venue2", { region: 'Southwest', state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
 
-            const output = getOutput() as any[];
+            const output = getOutput() as Array<{ region: string; states: Array<{ state: string; cities: Array<{ city: string; totalCapacity: number }> }> }>;
             
-            const dallasCity = output[0].states[0].cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = output[0].states[0].cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(70000);
         });
     });
@@ -387,8 +387,8 @@ describe('pipeline in() path prefix', () => {
                 createPipeline<{ region: string, state: string, city: string, population: number }>()
                     .groupBy(['region'], 'states')
                     .in('states').groupBy(['state'], 'cities')
-                    .in('states').defineProperty('stateLabel', (s: any) => `State: ${s.state}`)
-                    .in('states', 'cities').defineProperty('cityLabel', (c: any) => `City: ${c.city}`)
+                    .in('states').defineProperty('stateLabel', (s) => `State: ${s.state}`)
+                    .in('states', 'cities').defineProperty('cityLabel', (c) => `City: ${c.city}`)
             );
 
             pipeline.add("city1", { region: 'Southwest', state: 'TX', city: 'Dallas', population: 1000000 });
@@ -440,21 +440,21 @@ describe('pipeline in() path prefix', () => {
                 createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                     .groupBy(['state'], 'cities')
                     .in('cities').groupBy(['city'], 'venues')
-                    .in('cities').defineProperty('cityLabel', (c: any) => `City of ${c.city}`)
+                    .in('cities').defineProperty('cityLabel', (c) => `City of ${c.city}`)
                     .in('cities').commutativeAggregate(
                         'venues',
                         'venueCount',
-                        (acc: number | undefined, _: any) => (acc ?? 0) + 1,
-                        (acc: number, _: any) => acc - 1
+                        (acc: number | undefined, _) => (acc ?? 0) + 1,
+                        (acc: number, _) => acc - 1
                     )
             );
 
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
             pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
 
-            const output = getOutput() as any[];
+            const output = getOutput() as Array<{ state: string; cities: Array<{ city: string; cityLabel: string; venueCount: number }> }>;
             
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = output[0].cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.cityLabel).toBe('City of Dallas');
             expect(dallasCity?.venueCount).toBe(2);
         });

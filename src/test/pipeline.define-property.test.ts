@@ -47,38 +47,38 @@ describe('pipeline defineProperty', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .defineProperty('rootLabel' as any, (group: any) => `Root: ${group.category}`)
+                .defineProperty('rootLabel', (group) => `Root: ${group.category}`)
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
         pipeline.add("item2", { category: 'A', value: 20 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
         expect(output.length).toBe(1);
         // Root level should have the property
-        expect(output[0].rootLabel).toBe('Root: A');
+        expect((output[0] as { rootLabel?: string }).rootLabel).toBe('Root: A');
         // Nested items should NOT have the property (currently bug: they do)
-        expect(output[0].items[0].rootLabel).toBeUndefined();
-        expect(output[0].items[1].rootLabel).toBeUndefined();
+        expect(output[0].items[0] && 'rootLabel' in output[0].items[0] ? (output[0].items[0] as { rootLabel?: unknown }).rootLabel : undefined).toBeUndefined();
+        expect(output[0].items[1] && 'rootLabel' in output[0].items[1] ? (output[0].items[1] as { rootLabel?: unknown }).rootLabel : undefined).toBeUndefined();
     });
 
     it('should define property at scoped level when using in()', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .in('items').defineProperty('itemLabel' as any, (item: any) => `Item: ${item.value}`)
+                .in('items').defineProperty('itemLabel', (item) => `Item: ${item.value}`)
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
         pipeline.add("item2", { category: 'A', value: 20 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
         expect(output.length).toBe(1);
         // Root level should NOT have the property
-        expect(output[0].itemLabel).toBeUndefined();
+        expect(output[0] && 'itemLabel' in output[0] ? (output[0] as { itemLabel?: unknown }).itemLabel : undefined).toBeUndefined();
         // Nested items SHOULD have the property
-        expect(output[0].items[0].itemLabel).toBe('Item: 10');
-        expect(output[0].items[1].itemLabel).toBe('Item: 20');
+        expect((output[0].items[0] as { itemLabel?: string }).itemLabel).toBe('Item: 10');
+        expect((output[0].items[1] as { itemLabel?: string }).itemLabel).toBe('Item: 20');
     });
 });
 

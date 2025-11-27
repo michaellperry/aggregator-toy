@@ -26,8 +26,8 @@ describe('Aggregate Functions', () => {
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: null as any });
-            pipeline.add('item3', { category: 'A', price: undefined as any });
+            pipeline.add('item2', { category: 'A', price: null });
+            pipeline.add('item3', { category: 'A', price: undefined });
             pipeline.add('item4', { category: 'A', price: 50 });
 
             const output = getOutput();
@@ -63,7 +63,7 @@ describe('Aggregate Functions', () => {
 
             const output = getOutput();
             const txState = output.find(s => s.state === 'TX');
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = txState?.cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(70000);
         });
 
@@ -159,8 +159,8 @@ describe('Aggregate Functions', () => {
 
             const output = getOutput();
             const txState = output.find(s => s.state === 'TX');
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
-            const houstonCity = txState?.cities.find((c: any) => c.city === 'Houston');
+            const dallasCity = txState?.cities.find(c => c.city === 'Dallas');
+            const houstonCity = txState?.cities.find(c => c.city === 'Houston');
             expect(dallasCity?.venueCount).toBe(2);
             expect(houstonCity?.venueCount).toBe(1);
         });
@@ -204,8 +204,8 @@ describe('Aggregate Functions', () => {
                     .min(['items'] as ['items'], 'price', 'minPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: null as any });
-            pipeline.add('item2', { category: 'A', price: undefined as any });
+            pipeline.add('item1', { category: 'A', price: null });
+            pipeline.add('item2', { category: 'A', price: undefined });
             pipeline.add('item3', { category: 'A', price: 50 });
             pipeline.add('item4', { category: 'A', price: 100 });
 
@@ -250,7 +250,7 @@ describe('Aggregate Functions', () => {
 
             const output = getOutput();
             const txState = output.find(s => s.state === 'TX');
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = txState?.cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.minCapacity).toBe(20000);
         });
     });
@@ -293,8 +293,8 @@ describe('Aggregate Functions', () => {
                     .max(['items'] as ['items'], 'price', 'maxPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: null as any });
-            pipeline.add('item2', { category: 'A', price: undefined as any });
+            pipeline.add('item1', { category: 'A', price: null });
+            pipeline.add('item2', { category: 'A', price: undefined });
             pipeline.add('item3', { category: 'A', price: 50 });
             pipeline.add('item4', { category: 'A', price: 100 });
 
@@ -339,7 +339,7 @@ describe('Aggregate Functions', () => {
 
             const output = getOutput();
             const txState = output.find(s => s.state === 'TX');
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = txState?.cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.maxCapacity).toBe(50000);
         });
     });
@@ -405,8 +405,8 @@ describe('Aggregate Functions', () => {
                     .average(['items'] as ['items'], 'price', 'avgPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: null as any });
-            pipeline.add('item2', { category: 'A', price: undefined as any });
+            pipeline.add('item1', { category: 'A', price: null });
+            pipeline.add('item2', { category: 'A', price: undefined });
             pipeline.add('item3', { category: 'A', price: 100 });
             pipeline.add('item4', { category: 'A', price: 200 });
 
@@ -429,7 +429,7 @@ describe('Aggregate Functions', () => {
 
             const output = getOutput();
             const txState = output.find(s => s.state === 'TX');
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = txState?.cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.avgCapacity).toBe(35000); // (50000 + 20000) / 2
         });
     });
@@ -449,7 +449,7 @@ describe('Aggregate Functions', () => {
             const output = getOutput();
             const group = output.find(g => g.category === 'A');
             expect(group?.totalPrice).toBe(300);
-            expect((group as any)?.items).toBeUndefined();
+            expect(group && 'items' in group ? (group as { items?: unknown }).items : undefined).toBeUndefined();
         });
 
         it('should work with nested paths', () => {
@@ -465,7 +465,7 @@ describe('Aggregate Functions', () => {
 
             const output = getOutput();
             const txState = output.find(s => s.state === 'TX');
-            const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = (txState?.cities as Array<{ city: string; totalCapacity: number }> | undefined)?.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(70000);
         });
     });

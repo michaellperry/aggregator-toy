@@ -13,7 +13,7 @@ describe('pipeline dropArray', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         pipeline.add("item3", { category: 'B', value: 30 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         expect(output.length).toBe(2);
         
@@ -22,11 +22,11 @@ describe('pipeline dropArray', () => {
         
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
-        expect(groupA?.items).toBeUndefined();
+        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined();
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
-        expect(groupB?.items).toBeUndefined();
+        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
     });
 
     it('should drop one array while keeping others at the same level', () => {
@@ -63,7 +63,7 @@ describe('pipeline dropArray', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .defineProperty('groupLabel', (group: any) => `Group: ${group.category}`)
+                .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
                 .dropArray(['items'] as ['items'])
         );
 
@@ -71,7 +71,7 @@ describe('pipeline dropArray', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         pipeline.add("item3", { category: 'B', value: 30 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         expect(output.length).toBe(2);
         
@@ -81,12 +81,12 @@ describe('pipeline dropArray', () => {
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
         expect(groupA?.groupLabel).toBe('Group: A');
-        expect(groupA?.items).toBeUndefined();
+        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined();
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
         expect(groupB?.groupLabel).toBe('Group: B');
-        expect(groupB?.items).toBeUndefined();
+        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
     });
 
     it('should handle dropping an array that has no items', () => {
@@ -97,7 +97,7 @@ describe('pipeline dropArray', () => {
         );
 
         // Don't add any items - array should be empty
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         expect(output).toEqual([]);
         expect(output.length).toBe(0);
@@ -117,7 +117,7 @@ describe('pipeline dropArray event suppression', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         pipeline.add("item3", { category: 'B', value: 30 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // Groups may be created (via root-level [] events), but items should not be added
         // because item-level events at ['items'] path are suppressed.
@@ -125,7 +125,7 @@ describe('pipeline dropArray event suppression', () => {
         // for that path, so items won't be added to the state.
         // Verify: if groups exist, they should not have an items array
         output.forEach(group => {
-            expect(group.items).toBeUndefined();
+            expect(group && 'items' in group ? (group as { items?: unknown }).items : undefined).toBeUndefined();
         });
     });
 
@@ -140,7 +140,7 @@ describe('pipeline dropArray event suppression', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         
         // Verify items exist initially
-        let output = getOutput() as any[];
+        let output = getOutput();
         expect(output.length).toBe(1);
         expect(output[0].items).toBeDefined();
         expect(output[0].items.length).toBe(2);
@@ -157,7 +157,7 @@ describe('pipeline dropArray event suppression', () => {
         // Add items after dropping
         pipeline2.add("item3", { category: 'B', value: 30 });
         
-        const output2 = getOutput2() as any[];
+        const output2 = getOutput2() as Array<{ category?: string; items?: unknown }>;
         // Groups may be created but items array should not exist
         output2.forEach(group => {
             expect(group.items).toBeUndefined();
@@ -176,7 +176,7 @@ describe('pipeline dropArray event suppression', () => {
         pipeline1.add("item2", { category: 'A', value: 20 });
         
         // Verify items exist
-        let output1 = getOutput1() as any[];
+        let output1 = getOutput1();
         expect(output1.length).toBe(1);
         expect(output1[0].items.length).toBe(2);
         
@@ -189,14 +189,14 @@ describe('pipeline dropArray event suppression', () => {
         
         // Add items - these won't appear because add events are suppressed
         pipeline2.add("item3", { category: 'B', value: 30 });
-        let output2 = getOutput2() as any[];
+        let output2 = getOutput2() as Array<{ category?: string; items?: unknown }>;
         
         // Remove items - remove events at ['items'] should be suppressed
         // Since the type descriptor doesn't include ['items'], handlers aren't registered
         // for that path, so remove events won't affect the output
         pipeline2.remove("item3");
         
-        const outputAfterRemove = getOutput2() as any[];
+        const outputAfterRemove = getOutput2() as Array<{ category?: string; items?: unknown }>;
         // Output should be unchanged (items were never added due to suppressed add events)
         // Groups might be created/removed at root level, but item-level removes are suppressed
         outputAfterRemove.forEach(group => {
@@ -208,7 +208,7 @@ describe('pipeline dropArray event suppression', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .defineProperty('doubled', (item: any) => item.value * 2)
+                .in('items').defineProperty('doubled', (item) => item.value * 2)
                 .dropArray(['items'] as ['items'])
         );
 
@@ -216,7 +216,7 @@ describe('pipeline dropArray event suppression', () => {
         pipeline.add("item1", { category: 'A', value: 10 });
         pipeline.add("item2", { category: 'A', value: 20 });
         
-        let output = getOutput() as any[];
+        let output = getOutput() as Array<{ category?: string; items?: unknown }>;
         
         // Modify items (by removing and re-adding with different values)
         // Modify events at ['items'] should be suppressed
@@ -225,7 +225,7 @@ describe('pipeline dropArray event suppression', () => {
         
         // Output should not change because modify events at ['items'] are suppressed
         // Since items were never added (add events suppressed), modifies also have no effect
-        const outputAfterModify = getOutput() as any[];
+        const outputAfterModify = getOutput() as Array<{ category?: string; items?: unknown }>;
         outputAfterModify.forEach(group => {
             expect(group.items).toBeUndefined();
         });
@@ -243,7 +243,7 @@ describe('pipeline dropArray event suppression', () => {
         // This creates a city group
         pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Venue1', capacity: 100 });
         
-        let output = getOutput() as any[];
+        let output = getOutput() as Array<{ state: string; cities?: Array<{ city: string; venues?: unknown }> }>;
         
         // Cities array should exist (parent level)
         expect(output.length).toBeGreaterThan(0);
@@ -259,7 +259,7 @@ describe('pipeline dropArray event suppression', () => {
         
         // Add more items - venues array should still not appear
         pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Venue2', capacity: 200 });
-        output = getOutput() as any[];
+        output = getOutput() as Array<{ state: string; cities?: Array<{ city: string; venues?: unknown }> }>;
         const txState2 = output.find(s => s.state === 'TX');
         if (txState2?.cities && txState2.cities.length > 0) {
             const dallasCity2 = txState2.cities[0];
@@ -280,7 +280,7 @@ describe('pipeline dropArray integration', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         pipeline.add("item3", { category: 'B', value: 30 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // Group key properties should remain
         expect(output.length).toBe(2);
@@ -289,11 +289,11 @@ describe('pipeline dropArray integration', () => {
         
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
-        expect(groupA?.items).toBeUndefined();
+        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined();
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
-        expect(groupB?.items).toBeUndefined();
+        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
     });
 
     it('should work with commutativeAggregate to keep aggregate but remove array', () => {
@@ -303,8 +303,8 @@ describe('pipeline dropArray integration', () => {
                 .commutativeAggregate(
                     ['items'] as ['items'],
                     'total',
-                    (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
-                    (acc: number, item: any) => acc - item.value
+                    (acc: number | undefined, item) => (acc ?? 0) + item.value,
+                    (acc: number, item) => acc - item.value
                 )
                 .dropArray(['items'] as ['items'])
         );
@@ -314,7 +314,7 @@ describe('pipeline dropArray integration', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         pipeline.add("item3", { category: 'B', value: 30 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // Groups should exist with aggregate property
         expect(output.length).toBe(2);
@@ -324,16 +324,16 @@ describe('pipeline dropArray integration', () => {
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
         expect(groupA?.total).toBe(30); // 10 + 20
-        expect(groupA?.items).toBeUndefined(); // Array should be removed
+        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined(); // Array should be removed
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
         expect(groupB?.total).toBe(30);
-        expect(groupB?.items).toBeUndefined();
+        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
         
         // Remove an item - aggregate should update
         pipeline.remove("item1");
-        const outputAfterRemove = getOutput() as any[];
+        const outputAfterRemove = getOutput() as Array<{ category: string; total: number; items?: unknown }>;
         const groupAAfter = outputAfterRemove.find(g => g.category === 'A');
         expect(groupAAfter?.total).toBe(20); // Updated aggregate
         expect(groupAAfter?.items).toBeUndefined(); // Array still removed
@@ -343,14 +343,14 @@ describe('pipeline dropArray integration', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .defineProperty('groupLabel', (group: any) => `Group: ${group.category}`)
+                .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
                 .dropArray(['items'] as ['items'])
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
         pipeline.add("item2", { category: 'B', value: 20 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         expect(output.length).toBe(2);
         const groupA = output.find(g => g.category === 'A');
@@ -359,12 +359,12 @@ describe('pipeline dropArray integration', () => {
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
         expect(groupA?.groupLabel).toBe('Group: A'); // Computed property preserved
-        expect(groupA?.items).toBeUndefined(); // Array removed
+        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined(); // Array removed
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
         expect(groupB?.groupLabel).toBe('Group: B');
-        expect(groupB?.items).toBeUndefined();
+        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
     });
 
     it('should allow defineProperty after dropArray on remaining structure', () => {
@@ -372,13 +372,13 @@ describe('pipeline dropArray integration', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .dropArray(['items'] as ['items'])
-                .defineProperty('groupLabel', (group: any) => `Group: ${group.category}`)
+                .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
         pipeline.add("item2", { category: 'B', value: 20 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         expect(output.length).toBe(2);
         const groupA = output.find(g => g.category === 'A');
@@ -387,12 +387,12 @@ describe('pipeline dropArray integration', () => {
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
         expect(groupA?.groupLabel).toBe('Group: A'); // Can compute on remaining structure
-        expect(groupA?.items).toBeUndefined();
+        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined();
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
         expect(groupB?.groupLabel).toBe('Group: B');
-        expect(groupB?.items).toBeUndefined();
+        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
     });
 
     it('should work with dropProperty together', () => {
@@ -406,11 +406,12 @@ describe('pipeline dropArray integration', () => {
         pipeline.add("item1", { category: 'A', value: 10, extra: 'x' });
         pipeline.add("item2", { category: 'B', value: 20, extra: 'y' });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         expect(output.length).toBe(2);
-        const groupA = output.find(g => g.category === 'A');
-        const groupB = output.find(g => g.category === 'B');
+        const outputTyped = output as Array<{ category: string; extra?: unknown; items?: unknown }>;
+        const groupA = outputTyped.find(g => g.category === 'A');
+        const groupB = outputTyped.find(g => g.category === 'B');
         
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
@@ -437,7 +438,7 @@ describe('pipeline dropArray nested scenarios', () => {
         pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Venue2', capacity: 200 });
         pipeline.add("venue3", { state: 'TX', city: 'Houston', venue: 'Venue3', capacity: 300 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // States array should exist
         expect(output.length).toBe(1);
@@ -446,8 +447,8 @@ describe('pipeline dropArray nested scenarios', () => {
         
         // Cities array should exist
         expect(output[0].cities.length).toBe(2);
-        const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
-        const houstonCity = output[0].cities.find((c: any) => c.city === 'Houston');
+        const dallasCity = (output[0].cities as Array<{ city: string; venues?: unknown }>).find(c => c.city === 'Dallas');
+        const houstonCity = (output[0].cities as Array<{ city: string; venues?: unknown }>).find(c => c.city === 'Houston');
         
         expect(dallasCity).toBeDefined();
         expect(dallasCity?.city).toBe('Dallas');
@@ -470,7 +471,7 @@ describe('pipeline dropArray nested scenarios', () => {
         pipeline.add("b1", { state: 'TX', city: 'Dallas', town: 'Plano', building: 'Tower', floors: 10 });
         pipeline.add("b2", { state: 'TX', city: 'Dallas', town: 'Plano', building: 'Plaza', floors: 5 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // States array should exist
         expect(output.length).toBe(1);
@@ -478,8 +479,9 @@ describe('pipeline dropArray nested scenarios', () => {
         expect(output[0].cities).toBeDefined();
         
         // Cities array should exist
-        expect(output[0].cities.length).toBe(1);
-        const dallasCity = output[0].cities[0];
+        const outputTyped = output as Array<{ state: string; cities: Array<{ city: string; towns: Array<{ town: string; buildings?: unknown }> }> }>;
+        expect(outputTyped[0].cities.length).toBe(1);
+        const dallasCity = outputTyped[0].cities[0];
         expect(dallasCity.city).toBe('Dallas');
         expect(dallasCity.towns).toBeDefined();
         
@@ -502,11 +504,11 @@ describe('pipeline dropArray nested scenarios', () => {
         pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Venue1', capacity: 100 });
         pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Venue2', capacity: 200 });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // Cities array should exist (parent level)
         if (output.length > 0 && output[0].cities) {
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = (output[0].cities as Array<{ city: string; venues?: unknown }> | undefined)?.find(c => c.city === 'Dallas');
             if (dallasCity) {
                 // Venues array should not exist because events at ['cities', 'venues'] are suppressed
                 expect(dallasCity.venues).toBeUndefined();
@@ -529,11 +531,11 @@ describe('pipeline dropArray nested scenarios', () => {
         pipeline.add("staff1", { state: 'TX', city: 'Dallas', venue: 'Venue1', staff: 'John', role: 'Manager' });
         pipeline.add("staff2", { state: 'TX', city: 'Dallas', venue: 'Venue1', staff: 'Jane', role: 'Server' });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // Cities array should exist
         if (output.length > 0 && output[0].cities) {
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = (output[0].cities as Array<{ city: string; venues?: unknown }> | undefined)?.find(c => c.city === 'Dallas');
             if (dallasCity) {
                 // Venues array should be dropped
                 expect(dallasCity.venues).toBeUndefined();
@@ -554,11 +556,11 @@ describe('pipeline dropArray nested scenarios', () => {
 
         pipeline.add("staff1", { state: 'TX', city: 'Dallas', venue: 'Venue1', staff: 'John', role: 'Manager' });
 
-        const output = getOutput() as any[];
+        const output = getOutput();
 
         // Cities array should exist
         if (output.length > 0 && output[0].cities) {
-            const dallasCity = output[0].cities.find((c: any) => c.city === 'Dallas');
+            const dallasCity = (output[0].cities as Array<{ city: string; venues?: unknown }> | undefined)?.find(c => c.city === 'Dallas');
             if (dallasCity) {
                 // Both dropped arrays should be absent
                 expect(dallasCity.venues).toBeUndefined();

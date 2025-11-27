@@ -16,8 +16,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -26,7 +26,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ path: string[]; key: string; name: string; value: any }> = [];
+            const modifiedEvents: Array<{ path: string[]; key: string; name: string; value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ path: [...path], key, name, value });
             });
@@ -46,8 +46,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -77,8 +77,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -87,7 +87,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -111,8 +111,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -121,7 +121,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -148,8 +148,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -158,7 +158,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ name: string; value: any }> = [];
+            const modifiedEvents: Array<{ name: string; value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ name, value });
             });
@@ -185,8 +185,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -195,7 +195,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -222,8 +222,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -232,7 +232,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ key: string; value: any }> = [];
+            const modifiedEvents: Array<{ key: string; value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ key, value });
             });
@@ -259,8 +259,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['department'], 'employees');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).salary;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).salary;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { salary: number }).salary;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { salary: number }).salary;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -269,7 +269,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ key: string; value: any }> = [];
+            const modifiedEvents: Array<{ key: string; value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ key, value });
             });
@@ -307,8 +307,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['state'], 'cities');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).capacity;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).capacity;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { capacity: number }).capacity;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { capacity: number }).capacity;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -317,7 +317,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ path: string[]; key: string; name: string; value: any }> = [];
+            const modifiedEvents: Array<{ path: string[]; key: string; name: string; value: number }> = [];
             aggregateStep.onModified(['cities'], (path, key, name, value) => {
                 modifiedEvents.push({ path: [...path], key, name, value });
             });
@@ -349,7 +349,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ path: string[]; key: string; value: any }> = [];
+            const modifiedEvents: Array<{ path: string[]; key: string; value: number }> = [];
             aggregateStep.onModified(['cities'], (path, key, name, value) => {
                 modifiedEvents.push({ path: [...path], key, value });
             });
@@ -382,9 +382,9 @@ describe('CommutativeAggregateStep', () => {
                 if (acc === undefined) {
                     receivedUndefined = true;
                 }
-                return (acc ?? 0) + (item as any).value;
+                return (acc ?? 0) + (item as { value: number }).value;
             };
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -393,7 +393,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -417,9 +417,9 @@ describe('CommutativeAggregateStep', () => {
                 if (acc === undefined) {
                     undefinedCount.count++;
                 }
-                return (acc ?? 0) + (item as any).value;
+                return (acc ?? 0) + (item as { value: number }).value;
             };
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -454,7 +454,7 @@ describe('CommutativeAggregateStep', () => {
             type Stats = { min: number; max: number; sum: number; count: number };
             
             const addOp: AddOperator<ImmutableProps, Stats> = (acc, item) => {
-                const value = (item as any).value;
+                const value = (item as { value: number }).value;
                 if (acc === undefined) {
                     return { min: value, max: value, sum: value, count: 1 };
                 }
@@ -466,7 +466,7 @@ describe('CommutativeAggregateStep', () => {
                 };
             };
             const subtractOp: SubtractOperator<ImmutableProps, Stats> = (acc, item) => {
-                const value = (item as any).value;
+                const value = (item as { value: number }).value;
                 return {
                     min: acc.min, // Note: can't properly update min on removal without full recalc
                     max: acc.max,
@@ -504,8 +504,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { value: number }).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -514,7 +514,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -538,8 +538,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { value: number }).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -548,7 +548,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -569,8 +569,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { value: number }).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -579,7 +579,7 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            const modifiedEvents: Array<{ value: any }> = [];
+            const modifiedEvents: Array<{ value: number }> = [];
             aggregateStep.onModified([], (path, key, name, value) => {
                 modifiedEvents.push({ value });
             });
@@ -606,8 +606,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -636,8 +636,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { value: number }).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -663,8 +663,8 @@ describe('CommutativeAggregateStep', () => {
                 .groupBy(['category'], 'items');
             
             const step = builder['lastStep'] as Step;
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).price;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).price;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { price: number }).price;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { price: number }).price;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -674,7 +674,7 @@ describe('CommutativeAggregateStep', () => {
             );
             
             const addedEvents: Array<{ props: ImmutableProps }> = [];
-            const modifiedEvents: Array<{ name: string; value: any }> = [];
+            const modifiedEvents: Array<{ name: string; value: number }> = [];
             
             aggregateStep.onAdded([], (path, key, props) => {
                 addedEvents.push({ props: { ...props } });
@@ -718,8 +718,8 @@ describe('CommutativeAggregateStep', () => {
             // Input should have 'items' array
             expect(inputDescriptor.arrays.some(a => a.name === 'items')).toBe(true);
             
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { value: number }).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -744,8 +744,8 @@ describe('CommutativeAggregateStep', () => {
             // Input should have 'items' array
             expect(inputDescriptor.arrays.some(a => a.name === 'items')).toBe(true);
             
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).value;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).value;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { value: number }).value;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { value: number }).value;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -776,8 +776,8 @@ describe('CommutativeAggregateStep', () => {
             const citiesArray = inputDescriptor.arrays.find(a => a.name === 'cities');
             expect(citiesArray?.type.arrays.some(a => a.name === 'venues')).toBe(true);
             
-            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as any).capacity;
-            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as any).capacity;
+            const addOp: NumericAddOp = (acc, item) => (acc ?? 0) + (item as { capacity: number }).capacity;
+            const subtractOp: NumericSubtractOp = (acc, item) => acc - (item as { capacity: number }).capacity;
             
             const aggregateStep = new CommutativeAggregateStep(
                 step,
@@ -847,8 +847,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'totalPrice',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
-                            (acc: number, item: any) => acc - item.price
+                            (acc: number | undefined, item) => (acc ?? 0) + item.price,
+                            (acc: number, item) => acc - item.price
                         )
                 );
 
@@ -867,8 +867,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'totalPrice',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
-                            (acc: number, item: any) => acc - item.price
+                            (acc: number | undefined, item) => (acc ?? 0) + item.price,
+                            (acc: number, item) => acc - item.price
                         )
                 );
 
@@ -891,8 +891,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'totalPrice',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
-                            (acc: number, item: any) => acc - item.price
+                            (acc: number | undefined, item) => (acc ?? 0) + item.price,
+                            (acc: number, item) => acc - item.price
                         )
                 );
 
@@ -917,8 +917,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'total',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
-                            (acc: number, item: any) => acc - item.price
+                            (acc: number | undefined, item) => (acc ?? 0) + item.price,
+                            (acc: number, item) => acc - item.price
                         )
                 );
 
@@ -942,8 +942,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'totalPrice',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.price,
-                            (acc: number, item: any) => acc - item.price
+                            (acc: number | undefined, item) => (acc ?? 0) + item.price,
+                            (acc: number, item) => acc - item.price
                         )
                 );
 
@@ -967,8 +967,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['employees'] as ['employees'],
                             'totalSalary',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.salary,
-                            (acc: number, item: any) => acc - item.salary
+                            (acc: number | undefined, item) => (acc ?? 0) + item.salary,
+                            (acc: number, item) => acc - item.salary
                         )
                 );
 
@@ -1001,8 +1001,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['cities', 'venues'] as ['cities', 'venues'],
                             'totalCapacity',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.capacity,
-                            (acc: number, item: any) => acc - item.capacity
+                            (acc: number | undefined, item) => (acc ?? 0) + item.capacity,
+                            (acc: number, item) => acc - item.capacity
                         )
                 );
 
@@ -1012,7 +1012,7 @@ describe('CommutativeAggregateStep', () => {
                 const output = getOutput();
                 const txState = output.find(s => s.state === 'TX');
                 expect(txState).toBeDefined();
-                const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
+                const dallasCity = (txState?.cities as Array<{ city: string; totalCapacity: number }> | undefined)?.find(c => c.city === 'Dallas');
                 expect(dallasCity?.totalCapacity).toBe(70000);
             });
 
@@ -1024,8 +1024,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['cities', 'venues'] as ['cities', 'venues'],
                             'venueCount',
-                            (acc: number | undefined, _item: any) => (acc ?? 0) + 1,
-                            (acc: number, _item: any) => acc - 1
+                            (acc: number | undefined, _item) => (acc ?? 0) + 1,
+                            (acc: number, _item) => acc - 1
                         )
                 );
 
@@ -1035,9 +1035,9 @@ describe('CommutativeAggregateStep', () => {
 
                 const output = getOutput();
                 const txState = output.find(s => s.state === 'TX');
-                const dallasCity = txState?.cities.find((c: any) => c.city === 'Dallas');
-                const houstonCity = txState?.cities.find((c: any) => c.city === 'Houston');
-
+                const dallasCity = (txState?.cities as Array<{ city: string; venueCount: number }> | undefined)?.find(c => c.city === 'Dallas');
+                const houstonCity = (txState?.cities as Array<{ city: string; venueCount: number }> | undefined)?.find(c => c.city === 'Houston');
+                
                 expect(dallasCity?.venueCount).toBe(2);
                 expect(houstonCity?.venueCount).toBe(1);
             });
@@ -1051,8 +1051,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'total',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
-                            (acc: number, item: any) => acc - item.value
+                            (acc: number | undefined, item) => (acc ?? 0) + item.value,
+                            (acc: number, item) => acc - item.value
                         )
                 );
 
@@ -1072,8 +1072,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'total',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
-                            (acc: number, item: any) => acc - item.value
+                            (acc: number | undefined, item) => (acc ?? 0) + item.value,
+                            (acc: number, item) => acc - item.value
                         )
                 );
 
@@ -1097,8 +1097,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'total',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
-                            (acc: number, item: any) => acc - item.value
+                            (acc: number | undefined, item) => (acc ?? 0) + item.value,
+                            (acc: number, item) => acc - item.value
                         )
                 );
 
@@ -1122,8 +1122,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'total',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.value,
-                            (acc: number, item: any) => acc - item.value
+                            (acc: number | undefined, item) => (acc ?? 0) + item.value,
+                            (acc: number, item) => acc - item.value
                         )
                         .dropArray(['items'] as ['items'])
                 );
@@ -1139,29 +1139,29 @@ describe('CommutativeAggregateStep', () => {
 
                 expect(groupA?.category).toBe('A');
                 expect(groupA?.total).toBe(30);
-                expect((groupA as any)?.items).toBeUndefined();
+                expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined();
 
                 expect(groupB?.category).toBe('B');
                 expect(groupB?.total).toBe(30);
-                expect((groupB as any)?.items).toBeUndefined();
+                expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
 
                 pipeline.remove('item1');
                 output = getOutput();
                 const groupAAfter = output.find(g => g.category === 'A');
                 expect(groupAAfter?.total).toBe(20);
-                expect((groupAAfter as any)?.items).toBeUndefined();
+                expect(groupAAfter && 'items' in groupAAfter ? (groupAAfter as { items?: unknown }).items : undefined).toBeUndefined();
             });
 
             it('should work with defineProperty before aggregation (builder API)', () => {
                 const [pipeline, getOutput] = createTestPipeline(() => 
                     createPipeline<{ category: string; price: number; quantity: number }>()
                         .groupBy(['category'], 'items')
-                        .in('items').defineProperty('extendedPrice', (item: any) => item.price * item.quantity)
+                        .in('items').defineProperty('extendedPrice', (item) => item.price * item.quantity)
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'totalRevenue',
-                            (acc: number | undefined, item: any) => (acc ?? 0) + item.extendedPrice,
-                            (acc: number, item: any) => acc - item.extendedPrice
+                            (acc: number | undefined, item) => (acc ?? 0) + item.extendedPrice,
+                            (acc: number, item) => acc - item.extendedPrice
                         )
                 );
 
@@ -1182,8 +1182,8 @@ describe('CommutativeAggregateStep', () => {
                         .commutativeAggregate(
                             ['items'] as ['items'],
                             'count',
-                            (acc: number | undefined, _item: any) => (acc ?? 0) + 1,
-                            (acc: number, _item: any) => acc - 1
+                            (acc: number | undefined, _item) => (acc ?? 0) + 1,
+                            (acc: number, _item) => acc - 1
                         )
                 );
 
