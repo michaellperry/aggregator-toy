@@ -1,12 +1,12 @@
 import { createPipeline } from '../index';
 import { createTestPipeline } from './helpers';
 
-describe('pipeline dropArray', () => {
+describe('pipeline dropProperty (array behavior)', () => {
     it('should remove a top-level array created by groupBy', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -64,7 +64,7 @@ describe('pipeline dropArray', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -93,7 +93,7 @@ describe('pipeline dropArray', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         // Don't add any items - array should be empty
@@ -104,12 +104,12 @@ describe('pipeline dropArray', () => {
     });
 });
 
-describe('pipeline dropArray event suppression', () => {
+describe('pipeline dropProperty event suppression (for arrays)', () => {
     it('should suppress add events for items added after drop', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         // Add items after dropping - item-level events should be suppressed
@@ -121,7 +121,7 @@ describe('pipeline dropArray event suppression', () => {
 
         // Groups may be created (via root-level [] events), but items should not be added
         // because item-level events at ['items'] path are suppressed.
-        // Since dropArray removes ['items'] from the type descriptor, handlers aren't registered
+        // Since dropProperty removes ['items'] from the type descriptor, handlers aren't registered
         // for that path, so items won't be added to the state.
         // Verify: if groups exist, they should not have an items array
         output.forEach(group => {
@@ -151,7 +151,7 @@ describe('pipeline dropArray event suppression', () => {
         const [pipeline2, getOutput2] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
         );
         
         // Add items after dropping
@@ -165,7 +165,7 @@ describe('pipeline dropArray event suppression', () => {
     });
 
     it('should suppress remove events for items removed after drop', () => {
-        // Create pipeline without dropArray first to add items
+        // Create pipeline without dropProperty first to add items
         const [pipeline1, getOutput1] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
@@ -180,11 +180,11 @@ describe('pipeline dropArray event suppression', () => {
         expect(output1.length).toBe(1);
         expect(output1[0].items.length).toBe(2);
         
-        // Now create pipeline with dropArray
+        // Now create pipeline with dropProperty
         const [pipeline2, getOutput2] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
         );
         
         // Add items - these won't appear because add events are suppressed
@@ -209,7 +209,7 @@ describe('pipeline dropArray event suppression', () => {
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .in('items').defineProperty('doubled', (item) => item.value * 2)
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         // Add items - add events are suppressed, so items won't be added
@@ -236,7 +236,7 @@ describe('pipeline dropArray event suppression', () => {
             createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .in('cities').dropArray('venues')
+                .in('cities').dropProperty('venues')
         );
 
         // Add items at cities level (parent of dropped path) - should work
@@ -268,12 +268,12 @@ describe('pipeline dropArray event suppression', () => {
     });
 });
 
-describe('pipeline dropArray integration', () => {
+describe('pipeline dropProperty integration (for arrays)', () => {
     it('should work with groupBy to remove array but keep keys', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -306,7 +306,7 @@ describe('pipeline dropArray integration', () => {
                     (acc: number | undefined, item) => (acc ?? 0) + item.value,
                     (acc: number, item) => acc - item.value
                 )
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         // Add items
@@ -314,7 +314,7 @@ describe('pipeline dropArray integration', () => {
         pipeline.add("item2", { category: 'A', value: 20 });
         pipeline.add("item3", { category: 'B', value: 30 });
 
-        const output = getOutput();
+        const output = getOutput() as Array<{ category: string; total: number; items?: unknown }>;
 
         // Groups should exist with aggregate property
         expect(output.length).toBe(2);
@@ -324,12 +324,12 @@ describe('pipeline dropArray integration', () => {
         expect(groupA).toBeDefined();
         expect(groupA?.category).toBe('A');
         expect(groupA?.total).toBe(30); // 10 + 20
-        expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined(); // Array should be removed
+        expect(groupA?.items).toBeUndefined(); // Array should be removed
         
         expect(groupB).toBeDefined();
         expect(groupB?.category).toBe('B');
         expect(groupB?.total).toBe(30);
-        expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
+        expect(groupB?.items).toBeUndefined();
         
         // Remove an item - aggregate should update
         pipeline.remove("item1");
@@ -339,12 +339,12 @@ describe('pipeline dropArray integration', () => {
         expect(groupAAfter?.items).toBeUndefined(); // Array still removed
     });
 
-    it('should preserve computed properties when defineProperty is before dropArray', () => {
+    it('should preserve computed properties when defineProperty is before dropProperty', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
                 .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
-                .dropArray('items')
+                .dropProperty('items')
         );
 
         pipeline.add("item1", { category: 'A', value: 10 });
@@ -367,11 +367,11 @@ describe('pipeline dropArray integration', () => {
         expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
     });
 
-    it('should allow defineProperty after dropArray on remaining structure', () => {
+    it('should allow defineProperty after dropProperty on remaining structure', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ category: string, value: number }>()
                 .groupBy(['category'], 'items')
-                .dropArray('items')
+                .dropProperty('items')
                 .defineProperty('groupLabel', (group) => `Group: ${group.category}`)
         );
 
@@ -396,12 +396,13 @@ describe('pipeline dropArray integration', () => {
     });
 
     it('should work with dropProperty together', () => {
-        const [pipeline, getOutput] = createTestPipeline(() => 
-            createPipeline<{ category: string, value: number, extra: string }>()
+        const [pipeline, getOutput] = createTestPipeline(() => {
+            const builder = createPipeline<{ category: string, value: number, extra: string }>()
                 .groupBy(['category'], 'items')
-                .dropProperty('extra' as any)
-                .dropArray('items')
-        );
+                .dropProperty('extra' as any);  // 'extra' is not a valid key at root after groupBy, but test verifies it's handled gracefully
+            // After dropProperty with 'as any', TypeScript loses type info, so we need to assert the builder
+            return (builder as any as { dropProperty: (name: 'items') => any }).dropProperty('items');
+        });
 
         pipeline.add("item1", { category: 'A', value: 10, extra: 'x' });
         pipeline.add("item2", { category: 'B', value: 20, extra: 'y' });
@@ -425,13 +426,13 @@ describe('pipeline dropArray integration', () => {
     });
 });
 
-describe('pipeline dropArray nested scenarios', () => {
+describe('pipeline dropProperty nested scenarios (for arrays)', () => {
     it('should drop nested array at two levels', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .in('cities').dropArray('venues')
+                .in('cities').dropProperty('venues')
         );
 
         pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Venue1', capacity: 100 });
@@ -465,7 +466,7 @@ describe('pipeline dropArray nested scenarios', () => {
                 .groupBy(['state', 'city', 'town'], 'buildings')
                 .groupBy(['state', 'city'], 'towns')
                 .groupBy(['state'], 'cities')
-                .in('cities', 'towns').dropArray('buildings')
+                .in('cities', 'towns').dropProperty('buildings')
         );
 
         pipeline.add("b1", { state: 'TX', city: 'Dallas', town: 'Plano', building: 'Tower', floors: 10 });
@@ -497,7 +498,7 @@ describe('pipeline dropArray nested scenarios', () => {
             createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .in('cities').dropArray('venues')
+                .in('cities').dropProperty('venues')
         );
 
         // Add items at the dropped path level - events should be suppressed
@@ -524,7 +525,7 @@ describe('pipeline dropArray nested scenarios', () => {
                 .groupBy(['state', 'city', 'venue'], 'staff')
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .in('cities').dropArray('venues')
+                .in('cities').dropProperty('venues')
         );
 
         // Add items at the dropped path and below it
@@ -544,14 +545,14 @@ describe('pipeline dropArray nested scenarios', () => {
         }
     });
 
-    it('should handle multiple dropArray calls at different levels', () => {
+    it('should handle multiple dropProperty calls at different levels', () => {
         const [pipeline, getOutput] = createTestPipeline(() => 
             createPipeline<{ state: string, city: string, venue: string, staff: string, role: string }>()
                 .groupBy(['state', 'city', 'venue'], 'staff')
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities')
-                .in('cities').dropArray('venues')
-                .in('cities', 'venues').dropArray('staff')
+                .in('cities').dropProperty('venues')
+                .in('cities', 'venues').dropProperty('staff')
         );
 
         pipeline.add("staff1", { state: 'TX', city: 'Dallas', venue: 'Venue1', staff: 'John', role: 'Manager' });

@@ -187,15 +187,15 @@ describe('pipeline in() path prefix', () => {
         });
     });
 
-    describe('in() with dropArray', () => {
+    describe('in() with dropProperty', () => {
         it('should drop array at the scoped level using normalized API', () => {
             // Using in() to drop venues array within cities
-            // Note: with normalized API, dropArray takes just the array name
+            // Note: with normalized API, dropProperty takes just the property name
             const [pipeline, getOutput] = createTestPipeline(() => 
                 createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                     .groupBy(['state'], 'cities')
                     .in('cities').groupBy(['city'], 'venues')
-                    .in('cities').dropArray('venues')
+                    .in('cities').dropProperty('venues')
             );
 
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
@@ -218,7 +218,7 @@ describe('pipeline in() path prefix', () => {
             });
         });
 
-        it('should work with aggregate then dropArray at scoped level', () => {
+        it('should work with aggregate then dropProperty at scoped level', () => {
             const [pipeline, getOutput] = createTestPipeline(() => 
                 createPipeline<{ state: string, city: string, venue: string, capacity: number }>()
                     .groupBy(['state'], 'cities')
@@ -229,7 +229,7 @@ describe('pipeline in() path prefix', () => {
                         (acc: number | undefined, v) => (acc ?? 0) + v.capacity,
                         (acc: number, v) => acc - v.capacity
                     )
-                    .in('cities').dropArray('venues')
+                    .in('cities').dropProperty('venues')
             );
 
             pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });

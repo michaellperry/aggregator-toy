@@ -435,21 +435,21 @@ describe('Aggregate Functions', () => {
     });
 
     describe('integration with other steps', () => {
-        it('should work with dropArray', () => {
+        it('should work with dropProperty', () => {
             const [pipeline, getOutput] = createTestPipeline(() =>
                 createPipeline<{ category: string; price: number }>()
                     .groupBy(['category'], 'items')
                     .sum('items', 'price', 'totalPrice')
-                    .dropArray('items')
+                    .dropProperty('items')
             );
 
             pipeline.add('item1', { category: 'A', price: 100 });
             pipeline.add('item2', { category: 'A', price: 200 });
 
-            const output = getOutput();
+            const output = getOutput() as Array<{ category: string; totalPrice: number; items?: unknown }>;
             const group = output.find(g => g.category === 'A');
             expect(group?.totalPrice).toBe(300);
-            expect(group && 'items' in group ? (group as { items?: unknown }).items : undefined).toBeUndefined();
+            expect(group?.items).toBeUndefined();
         });
 
         it('should work with nested paths', () => {

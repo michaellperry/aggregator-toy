@@ -1,7 +1,7 @@
-import { createPipeline, TypeDescriptor } from '../index';
-import { CommutativeAggregateStep, AddOperator, SubtractOperator } from '../steps/commutative-aggregate';
-import { DropArrayStep } from '../steps/drop-array';
-import type { Step, ImmutableProps } from '../pipeline';
+import { createPipeline } from '../index';
+import type { ImmutableProps, Step } from '../pipeline';
+import { AddOperator, CommutativeAggregateStep, SubtractOperator } from '../steps/commutative-aggregate';
+import { DropPropertyStep } from '../steps/drop-property';
 import { createTestPipeline } from './helpers';
 
 // Helper type aliases for cleaner test code
@@ -730,11 +730,11 @@ describe('CommutativeAggregateStep', () => {
             
             const outputDescriptor = aggregateStep.getTypeDescriptor();
             
-            // CommutativeAggregateStep should NOT remove the array (that's DropArrayStep's job)
+            // CommutativeAggregateStep should NOT remove the array (that's DropPropertyStep's job)
             expect(outputDescriptor.arrays.some(a => a.name === 'items')).toBe(true);
         });
 
-        it('should remove target array from type descriptor when chained with DropArrayStep', () => {
+        it('should remove target array from type descriptor when chained with DropPropertyStep', () => {
             const builder = createPipeline<{ category: string; value: number }>()
                 .groupBy(['category'], 'items');
             
@@ -754,16 +754,17 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            // Chain with DropArrayStep to remove the array
-            const dropArrayStep = new DropArrayStep(aggregateStep, ['items']);
+            // Chain with DropPropertyStep to remove the array
+            // Note: 'items' exists as an array in the type descriptor at runtime, even if TypeScript can't infer it
+            const dropPropertyStep = new DropPropertyStep<any, any>(aggregateStep, 'items', []);
             
-            const outputDescriptor = dropArrayStep.getTypeDescriptor();
+            const outputDescriptor = dropPropertyStep.getTypeDescriptor();
             
             // Output should NOT have 'items' array
             expect(outputDescriptor.arrays.some(a => a.name === 'items')).toBe(false);
         });
 
-        it('should handle nested array path in type descriptor transformation with DropArrayStep', () => {
+        it('should handle nested array path in type descriptor transformation with DropPropertyStep', () => {
             const builder = createPipeline<{ state: string; city: string; venue: string; capacity: number }>()
                 .groupBy(['state', 'city'], 'venues')
                 .groupBy(['state'], 'cities');
@@ -786,10 +787,11 @@ describe('CommutativeAggregateStep', () => {
                 { add: addOp, subtract: subtractOp }
             );
             
-            // Chain with DropArrayStep to remove the nested array
-            const dropArrayStep = new DropArrayStep(aggregateStep, ['cities', 'venues']);
+            // Chain with DropPropertyStep to remove the nested array
+            // Note: 'venues' exists as an array in the type descriptor at runtime, even if TypeScript can't infer it
+            const dropPropertyStep = new DropPropertyStep<any, any>(aggregateStep, 'venues', ['cities']);
             
-            const outputDescriptor = dropArrayStep.getTypeDescriptor();
+            const outputDescriptor = dropPropertyStep.getTypeDescriptor();
             
             // Output should still have 'cities' but without 'venues'
             expect(outputDescriptor.arrays.some(a => a.name === 'cities')).toBe(true);
@@ -1115,7 +1117,7 @@ describe('CommutativeAggregateStep', () => {
         });
 
         describe('integration with other steps', () => {
-            it('should work with dropArray to keep aggregate but remove array (builder API)', () => {
+            it('should work with dropProperty to keep aggregate but remove array (builder API)', () => {
                 const [pipeline, getOutput] = createTestPipeline(() => 
                     createPipeline<{ category: string; value: number }>()
                         .groupBy(['category'], 'items')
@@ -1125,31 +1127,31 @@ describe('CommutativeAggregateStep', () => {
                             (acc: number | undefined, item) => (acc ?? 0) + item.value,
                             (acc: number, item) => acc - item.value
                         )
-                        .dropArray('items')
+                        .dropProperty('items')
                 );
 
                 pipeline.add('item1', { category: 'A', value: 10 });
                 pipeline.add('item2', { category: 'A', value: 20 });
                 pipeline.add('item3', { category: 'B', value: 30 });
 
-                let output = getOutput();
+                let output = getOutput() as Array<{ category: string; total: number; items?: unknown }>;
                 expect(output.length).toBe(2);
                 const groupA = output.find(g => g.category === 'A');
                 const groupB = output.find(g => g.category === 'B');
 
                 expect(groupA?.category).toBe('A');
                 expect(groupA?.total).toBe(30);
-                expect(groupA && 'items' in groupA ? (groupA as { items?: unknown }).items : undefined).toBeUndefined();
+                expect(groupA?.items).toBeUndefined();
 
                 expect(groupB?.category).toBe('B');
                 expect(groupB?.total).toBe(30);
-                expect(groupB && 'items' in groupB ? (groupB as { items?: unknown }).items : undefined).toBeUndefined();
+                expect(groupB?.items).toBeUndefined();
 
                 pipeline.remove('item1');
-                output = getOutput();
+                output = getOutput() as Array<{ category: string; total: number; items?: unknown }>;
                 const groupAAfter = output.find(g => g.category === 'A');
                 expect(groupAAfter?.total).toBe(20);
-                expect(groupAAfter && 'items' in groupAAfter ? (groupAAfter as { items?: unknown }).items : undefined).toBeUndefined();
+                expect(groupAAfter?.items).toBeUndefined();
             });
 
             it('should work with defineProperty before aggregation (builder API)', () => {
