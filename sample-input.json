@@ -1,0 +1,62 @@
+[
+  {
+    "id": "item-001",
+    "category": "Electronics",
+    "value": 599.99,
+    "name": "Wireless Headphones"
+  },
+  {
+    "id": "item-002",
+    "category": "Electronics",
+    "value": 1299.99,
+    "name": "Laptop Computer"
+  },
+  {
+    "id": "item-003",
+    "category": "Books",
+    "value": 24.99,
+    "name": "TypeScript Handbook"
+  },
+  {
+    "id": "item-004",
+    "category": "Electronics",
+    "value": 89.99,
+    "name": "USB-C Cable"
+  },
+  {
+    "id": "item-005",
+    "category": "Books",
+    "value": 34.99,
+    "name": "Design Patterns"
+  },
+  {
+    "id": "item-006",
+    "category": "Furniture",
+    "value": 449.99,
+    "name": "Office Chair"
+  },
+  {
+    "id": "item-007",
+    "category": "Books",
+    "value": 19.99,
+    "name": "Clean Code"
+  },
+  {
+    "id": "item-008",
+    "category": "Furniture",
+    "value": 799.99,
+    "name": "Standing Desk"
+  },
+  {
+    "id": "item-009",
+    "category": "Electronics",
+    "value": 199.99,
+    "name": "Mechanical Keyboard"
+  },
+  {
+    "id": "item-010",
+    "category": "Furniture",
+    "value": 129.99,
+    "name": "Desk Lamp"
+  }
+]

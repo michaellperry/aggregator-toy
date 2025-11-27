@@ -1,0 +1,50 @@
+[
+  {
+    "key": "pi4GopdsRelhwCZ+2iUgmXR8oMU37TiP6Bey5Ik3GE0HIPSEbJxQHP0MfLcyLNd9h5nIEHm74siQm543URU2MQ==",
+    "value": {
+      "category": "Electronics",
+      "totalValue": 2189.96,
+      "itemCount": 4,
+      "averageValue": 547.49,
+      "maxValue": 1299.99,
+      "minValue": 89.99,
+      "mostExpensiveItem": {
+        "id": "item-002",
+        "value": 1299.99,
+        "name": "Laptop Computer"
+      }
+    }
+  },
+  {
+    "key": "IrkDDQW6nm2C9RWaAr50hXFAkFiXVkZ4VFMWAia7eX/b2X+2AGBYZDJUWofSl0L+QGeFSCbMDCSWdRdUd8f4yg==",
+    "value": {
+      "category": "Books",
+      "totalValue": 79.97,
+      "itemCount": 3,
+      "averageValue": 26.656666666666666,
+      "maxValue": 34.99,
+      "minValue": 19.99,
+      "mostExpensiveItem": {
+        "id": "item-005",
+        "value": 34.99,
+        "name": "Design Patterns"
+      }
+    }
+  },
+  {
+    "key": "pUbJ6wP7tMFTL77WIm0hFgD63dEvvHjaZV5J+zgGDgvHP6V2h+iWVLZJjT/RMnYOdZv5O3FyCETu6D6Wa9ABCA==",
+    "value": {
+      "category": "Furniture",
+      "totalValue": 1379.97,
+      "itemCount": 3,
+      "averageValue": 459.99,
+      "maxValue": 799.99,
+      "minValue": 129.99,
+      "mostExpensiveItem": {
+        "id": "item-008",
+        "value": 799.99,
+        "name": "Standing Desk"
+      }
+    }
+  }
+]
