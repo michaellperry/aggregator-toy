@@ -2,7 +2,11 @@
 
 ## Executive Summary
 
-This document describes the design for adding `immutableProps` to the `RemovedHandler` signature. This change enables stateless step implementations (like the upcoming `FilterStep`) and simplifies existing aggregate steps by eliminating per-step item storage.
+This document documents the implementation of `immutableProps` in the `RemovedHandler` signature. This change enables stateless step implementations (like `FilterStep`) and simplifies existing aggregate steps by eliminating per-step item storage.
+
+**Status: ✅ Implemented**
+
+The decision to add `immutableProps` to the `remove` pipeline function has been approved and implemented. This document serves as the authoritative reference for this architectural decision.
 
 ---
 
@@ -71,19 +75,17 @@ private handleRemoved(path: string[], key: string) {
 
 ---
 
-## 2. Proposed Changes
+## 2. Implementation Details
 
-### 2.1 Modified RemovedHandler Signature
+### 2.1 RemovedHandler Signature
 
-In [`src/pipeline.ts:21`](../src/pipeline.ts:21):
+The `RemovedHandler` signature in [`src/pipeline.ts:21`](../src/pipeline.ts:21) now includes `immutableProps`:
 
 ```typescript
-// Before
-export type RemovedHandler = (path: string[], key: string) => void;
-
-// After
 export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
 ```
+
+This matches the `AddedHandler` signature, providing symmetry in the API.
 
 ### 2.2 Step Interface Impact
 
@@ -100,20 +102,20 @@ export interface Step {
 
 ---
 
-## 3. InputPipeline Changes
+## 3. InputPipeline Implementation
 
-### 3.1 Required Changes
+### 3.1 Item Storage
 
-The [`InputPipeline`](../src/factory.ts:6) class must store items to pass them during removal:
+The [`InputPipeline`](../src/factory.ts:6) class now stores items to pass them during removal:
 
 ```typescript
 class InputPipeline<T> implements Pipeline<T>, Step {
     private addedHandlers: AddedHandler[] = [];
     private removedHandlers: RemovedHandler[] = [];
-    private items: Map<string, T> = new Map();  // NEW: Store items
+    private items: Map<string, T> = new Map();  // Stores items for removal
 
     add(key: string, immutableProps: T): void {
-        this.items.set(key, immutableProps);  // NEW: Store for later removal
+        this.items.set(key, immutableProps);  // Store for later removal
         this.addedHandlers.forEach(handler => handler([], key, immutableProps as ImmutableProps));
     }
 
@@ -121,7 +123,7 @@ class InputPipeline<T> implements Pipeline<T>, Step {
         const immutableProps = this.items.get(key);
         if (immutableProps !== undefined) {
             this.items.delete(key);
-            // NEW: Pass immutableProps to handlers
+            // Pass immutableProps to handlers
             this.removedHandlers.forEach(handler => handler([], key, immutableProps as ImmutableProps));
         }
         // If item not found, silently ignore (already removed)
@@ -137,98 +139,25 @@ class InputPipeline<T> implements Pipeline<T>, Step {
 }
 ```
 
-### 3.2 Design Considerations
+### 3.2 Design Decisions
 
-**Error handling for missing items**: If `remove()` is called for a key that wasn't added (or was already removed), the implementation should silently ignore the call rather than throwing. This handles idempotent removal scenarios.
+**Error handling for missing items**: If `remove()` is called for a key that wasn't added (or was already removed), the implementation silently ignores the call rather than throwing. This handles idempotent removal scenarios.
 
 ---
 
-## 4. GroupByStep Changes
+## 4. GroupByStep Implementation
 
-### 4.1 Current State
+### 4.1 Overview
 
-[`GroupByStep`](../src/steps/group-by.ts:6) maintains several maps but does NOT store the actual item `immutableProps`:
+[`GroupByStep`](../src/steps/group-by.ts:6) now receives and forwards `immutableProps` during removal events. The implementation uses Option B (re-extract props from received immutableProps) for cleaner, stateless operation:
 
-```typescript
-keyToGroupHash: Map<string, string> = new Map<string, string>();
-groupToKeys: Map<string, Set<string>> = new Map<string, Set<string>>();
-keyToParentPath: Map<string, string[]> = new Map<string, string[]>();
-// Missing: item props storage
-```
+### 4.2 Implementation Approach
 
-### 4.2 Required Changes
-
-**Option A: Store full item props**
-
-Add storage for the non-key properties (item-level immutableProps):
-
-```typescript
-// NEW: Store item's non-key properties for removal
-private itemPropsStore: Map<string, ImmutableProps> = new Map();
-```
-
-Modify [`handleAdded`](../src/steps/group-by.ts:196):
-
-```typescript
-private handleAdded(path: string[], key: string, immutableProps: ImmutableProps) {
-    // ... existing key extraction logic ...
-    
-    // Extract non-key properties
-    let nonKeyProps: ImmutableProps = {};
-    Object.keys(immutableProps).forEach(prop => {
-        if (!this.keyProperties.includes(prop as K)) {
-            nonKeyProps[prop] = immutableProps[prop];
-        }
-    });
-    
-    // NEW: Store for removal
-    this.itemPropsStore.set(key, nonKeyProps);
-    
-    // Notify item handlers
-    this.itemAddedHandlers.forEach(handler => handler([...parentPath, keyHash], key, nonKeyProps));
-}
-```
-
-Modify [`handleRemoved`](../src/steps/group-by.ts:234):
+The implementation re-extracts key and non-key props from the received `immutableProps`:
 
 ```typescript
 private handleRemoved(path: string[], key: string, immutableProps: ImmutableProps) {
-    const parentPath = this.keyToParentPath.get(key) || path;
-    const keyHash = this.keyToGroupHash.get(key);
-    
-    // Get stored non-key props for item removal notification
-    const nonKeyProps = this.itemPropsStore.get(key);
-    this.itemPropsStore.delete(key);
-    
-    // Notify item removed handlers WITH immutableProps
-    this.itemRemovedHandlers.forEach(handler => 
-        handler([...parentPath, keyHash], key, nonKeyProps || {})
-    );
-    
-    // ... rest of removal logic ...
-    
-    if (groupKeys.size === 0) {
-        // For group removal, reconstruct key props from immutableProps
-        let keyProps: ImmutableProps = {};
-        this.keyProperties.forEach(prop => {
-            keyProps[prop as string] = immutableProps[prop as string];
-        });
-        
-        // Notify group removed handlers WITH keyProps
-        this.groupRemovedHandlers.forEach(handler => 
-            handler(parentPath, keyHash, keyProps)
-        );
-    }
-}
-```
-
-**Option B: Re-extract props from received immutableProps**
-
-Since `GroupByStep` will now receive `immutableProps` in its removal callback, it can re-extract key/non-key props:
-
-```typescript
-private handleRemoved(path: string[], key: string, immutableProps: ImmutableProps) {
-    // Re-extract key and non-key props from received immutableProps
+    // Extract key and non-key props from received immutableProps
     let keyProps: ImmutableProps = {};
     let nonKeyProps: ImmutableProps = {};
     Object.keys(immutableProps).forEach(prop => {
@@ -239,24 +168,17 @@ private handleRemoved(path: string[], key: string, immutableProps: ImmutableProp
         }
     });
     
-    // ... use extracted props ...
+    // ... use extracted props for item and group removal notifications ...
 }
 ```
 
-**Recommendation**: Option B is cleaner - no additional storage needed if we receive full `immutableProps` from upstream.
+This approach requires no additional storage since `immutableProps` is now available from upstream.
 
-### 4.3 Nested Path Handler Updates
+### 4.3 Nested Path Handler Implementation
 
-The nested path removal interceptors at [lines 130-141](../src/steps/group-by.ts:130) also need updating:
+The nested path removal interceptors forward `immutableProps` through the handler chain:
 
 ```typescript
-// Before (line 130-141)
-this.input.onRemoved([...this.scopePath, ...shiftedPath], (notifiedPath, key) => {
-    // ...
-    handler(modifiedPath, key);  // No immutableProps
-});
-
-// After
 this.input.onRemoved([...this.scopePath, ...shiftedPath], (notifiedPath, key, immutableProps) => {
     const itemHash = notifiedPath[this.scopePath.length];
     const groupHash = this.keyToGroupHash.get(itemHash);
@@ -271,27 +193,7 @@ this.input.onRemoved([...this.scopePath, ...shiftedPath], (notifiedPath, key, im
 
 ### 5.1 CommutativeAggregateStep
 
-The [`itemStore`](../src/steps/commutative-aggregate.ts:75) can be removed entirely:
-
-**Before:**
-```typescript
-class CommutativeAggregateStep {
-    private itemStore: Map<string, ImmutableProps> = new Map();  // Can be removed
-    
-    private handleItemAdded(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
-        // Store item for later removal
-        this.itemStore.set(itemHash, item);  // No longer needed
-        // ...
-    }
-    
-    private handleItemRemoved(runtimePath: string[], itemKey: string): void {
-        const item = this.itemStore.get(itemHash);  // No longer needed
-        // ...
-    }
-}
-```
-
-**After:**
+With `immutableProps` available in removal events, the [`itemStore`](../src/steps/commutative-aggregate.ts:75) is no longer needed:
 ```typescript
 class CommutativeAggregateStep {
     // No itemStore needed!
@@ -321,19 +223,11 @@ class CommutativeAggregateStep {
 
 ### 5.2 MinMaxAggregateStep
 
-Similar simplification - remove [`itemStore`](../src/steps/min-max-aggregate.ts:27):
+The [`itemStore`](../src/steps/min-max-aggregate.ts:27) simplification follows the same pattern:
 
 ```typescript
-// Before: lines 145-151
-const item = this.itemStore.get(itemHash);
-if (!item) {
-    throw new Error(`Item ${itemKey} not found in item store`);
-}
-this.itemStore.delete(itemHash);
-
-// After: item received as parameter
 private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
-    // item is the parameter - no lookup needed!
+    // item is received as parameter - no lookup needed!
     const value = item[this.numericProperty];
     // ... rest of logic ...
 }
@@ -341,20 +235,20 @@ private handleItemRemoved(runtimePath: string[], itemKey: string, item: Immutabl
 
 ### 5.3 AverageAggregateStep
 
-Remove [`itemStore`](../src/steps/average-aggregate.ts:35) - same pattern as above.
+The [`itemStore`](../src/steps/average-aggregate.ts:35) follows the same pattern.
 
 ### 5.4 PickByMinMaxStep
 
-Remove [`itemStore`](../src/steps/pick-by-min-max.ts:53) - same pattern as above.
+The [`itemStore`](../src/steps/pick-by-min-max.ts:53) follows the same pattern.
 
-### 5.5 Summary of Removable Code
+### 5.5 Summary of Simplified Steps
 
-| Step | Lines to Remove | Storage Eliminated |
-|------|-----------------|-------------------|
-| `CommutativeAggregateStep` | ~75, ~152, ~190-196 | `itemStore: Map` |
-| `MinMaxAggregateStep` | ~27, ~101, ~145-151 | `itemStore: Map` |
-| `AverageAggregateStep` | ~35, ~108, ~153-159 | `itemStore: Map` |
-| `PickByMinMaxStep` | ~53, ~133, ~178-184 | `itemStore: Map` |
+| Step | Storage Eliminated | Benefit |
+|------|-------------------|---------|
+| `CommutativeAggregateStep` | `itemStore: Map` | Simpler, stateless removal handling |
+| `MinMaxAggregateStep` | `itemStore: Map` | Direct access to item in removal handler |
+| `AverageAggregateStep` | `itemStore: Map` | No redundant storage |
+| `PickByMinMaxStep` | `itemStore: Map` | Centralized item storage in InputPipeline |
 
 ---
 
@@ -362,29 +256,19 @@ Remove [`itemStore`](../src/steps/pick-by-min-max.ts:53) - same pattern as above
 
 ### 6.1 DefinePropertyStep
 
-[`DefinePropertyStep`](../src/steps/define-property.ts:29) just passes through removal events - needs signature update only:
+[`DefinePropertyStep`](../src/steps/define-property.ts:29) passes through removal events with the updated signature:
 
 ```typescript
-// Before
-onRemoved(pathNames: string[], handler: (path: string[], key: string) => void): void {
-    this.input.onRemoved(pathNames, handler);
-}
-
-// After
 onRemoved(pathNames: string[], handler: RemovedHandler): void {
-    this.input.onRemoved(pathNames, handler);  // Handler signature changed, pass-through works
+    this.input.onRemoved(pathNames, handler);  // Handler signature includes immutableProps
 }
 ```
 
 ### 6.2 DropPropertyStep
 
-[`DropPropertyStep`](../src/steps/drop-property.ts:119) also passes through - needs signature update:
+[`DropPropertyStep`](../src/steps/drop-property.ts:119) now filters `immutableProps` to remove dropped properties during removal:
 
 ```typescript
-// Before (line 126)
-this.input.onRemoved(pathNames, handler);
-
-// After - handler receives immutableProps, can filter if needed
 onRemoved(pathNames: string[], handler: RemovedHandler): void {
     if (this.isArrayProperty) {
         if (this.isAtOrBelowTargetArray(pathNames)) {
@@ -409,22 +293,16 @@ onRemoved(pathNames: string[], handler: RemovedHandler): void {
 
 ### 7.1 build() Method
 
-The [`build()`](../src/builder.ts:477) method registers handlers that receive events - the removal handler needs updating:
+The [`build()`](../src/builder.ts:477) method's removal handler now receives `immutableProps`:
 
 ```typescript
-// Before (line 486-488)
-this.lastStep.onRemoved(pathName, (path, key) => {
-    setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
-});
-
-// After
 this.lastStep.onRemoved(pathName, (path, key, immutableProps) => {
     // immutableProps available but not needed for removal from keyed array
     setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
 });
 ```
 
-No functional change needed - `removeFromKeyedArray` doesn't use `immutableProps`.
+No functional change needed - `removeFromKeyedArray` doesn't use `immutableProps`, but the parameter is now available for steps that need it.
 
 ---
 
@@ -478,39 +356,38 @@ Since items are immutable, re-extracting properties from `immutableProps` during
 
 ---
 
-## 9. Migration Path
+## 9. Implementation Status
 
-### 9.1 Implementation Order
+### 9.1 Completed Implementation
 
-1. **Phase 1: Core API Change**
-   - Update [`RemovedHandler`](../src/pipeline.ts:21) signature
-   - Update [`InputPipeline`](../src/factory.ts:6) to store and pass items
-   - Update [`build()`](../src/builder.ts:486) handler (accept param, ignore it)
+The following changes have been implemented:
 
-2. **Phase 2: GroupByStep**
-   - Update [`handleRemoved`](../src/steps/group-by.ts:234) to accept `immutableProps`
-   - Update item/group removal notifications to pass `immutableProps`
-   - Update nested path interceptors
+1. **✅ Phase 1: Core API Change**
+   - Updated [`RemovedHandler`](../src/pipeline.ts:21) signature to include `immutableProps`
+   - Updated [`InputPipeline`](../src/factory.ts:6) to store items and pass them during removal
+   - Updated [`build()`](../src/builder.ts:486) handler to accept the new parameter
 
-3. **Phase 3: Aggregate Step Simplifications**
-   - Update [`CommutativeAggregateStep`](../src/steps/commutative-aggregate.ts) - remove `itemStore`
-   - Update [`MinMaxAggregateStep`](../src/steps/min-max-aggregate.ts) - remove `itemStore`
-   - Update [`AverageAggregateStep`](../src/steps/average-aggregate.ts) - remove `itemStore`
-   - Update [`PickByMinMaxStep`](../src/steps/pick-by-min-max.ts) - remove `itemStore`
+2. **✅ Phase 2: GroupByStep**
+   - Updated [`handleRemoved`](../src/steps/group-by.ts:234) to accept and use `immutableProps`
+   - Updated item/group removal notifications to pass `immutableProps`
+   - Updated nested path interceptors
 
-4. **Phase 4: Property Steps**
-   - Update [`DefinePropertyStep`](../src/steps/define-property.ts)
-   - Update [`DropPropertyStep`](../src/steps/drop-property.ts)
+3. **✅ Phase 3: Aggregate Step Simplifications**
+   - Updated [`CommutativeAggregateStep`](../src/steps/commutative-aggregate.ts) to use passed `immutableProps`
+   - Updated [`MinMaxAggregateStep`](../src/steps/min-max-aggregate.ts) similarly
+   - Updated [`AverageAggregateStep`](../src/steps/average-aggregate.ts) similarly
+   - Updated [`PickByMinMaxStep`](../src/steps/pick-by-min-max.ts) similarly
 
-5. **Phase 5: New FilterStep** (separate task)
-   - Implement stateless `FilterStep` per [`docs/filter-design.md`](filter-design.md)
+4. **✅ Phase 4: Property Steps**
+   - Updated [`DefinePropertyStep`](../src/steps/define-property.ts)
+   - Updated [`DropPropertyStep`](../src/steps/drop-property.ts)
 
-### 9.2 Testing Strategy
+### 9.2 Enabled Future Work
 
-1. **Existing tests should continue to pass** - the change is backward compatible in behavior
-2. **Add tests for double-removal** - verify idempotent behavior
-3. **Add tests for removal of non-existent items** - verify silent handling
-4. **Verify aggregate steps work correctly** after `itemStore` removal
+With `immutableProps` available in removal events, the following is now possible:
+
+- **Stateless `FilterStep`** - Can re-evaluate predicates on removal without storing item data
+- **Simplified step implementations** - New steps can be designed without per-step item storage
 
 ---
 
@@ -593,12 +470,24 @@ flowchart TD
 
 ## 11. Summary
 
-This design change:
+This architectural change has been implemented and provides:
 
-1. **Adds `immutableProps` to `RemovedHandler`** - enabling steps to access item data during removal
-2. **Centralizes item storage in `InputPipeline`** - single source of truth
-3. **Enables stateless step implementations** - like the upcoming `FilterStep`
-4. **Simplifies aggregate steps** - removes redundant `itemStore` fields from 4 steps
-5. **Maintains backward compatibility** - existing behavior unchanged, just more data available
+1. **`immutableProps` in `RemovedHandler`** - All steps now have access to item data during removal events
+2. **Centralized item storage in `InputPipeline`** - Single source of truth for item data
+3. **Stateless step implementations** - Steps like `FilterStep` can be implemented without storing item data
+4. **Simplified aggregate steps** - Redundant `itemStore` fields eliminated from aggregate steps
+5. **Backward compatible behavior** - All existing functionality preserved with additional data available
 
-The key insight is that items are immutable, so storing them once at the input level and passing them through all events provides complete information to all steps without duplication.
+The key architectural insight is that items are immutable, so storing them once at the input level and passing them through all events provides complete information to all steps without duplication. This decision simplifies the overall pipeline architecture and enables cleaner step implementations.
+
+### API Reference
+
+**RemovedHandler signature:**
+```typescript
+export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
+```
+
+**Available immutableProps in remove handlers:**
+- Contains all properties that were passed when the item was added
+- Properties are unchanged (immutable) from addition time
+- Can be used to re-evaluate predicates, extract values for aggregation reversal, etc.

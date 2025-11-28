@@ -12,4 +12,6 @@ export { MinMaxAggregateStep } from './steps/min-max-aggregate';
 export { AverageAggregateStep } from './steps/average-aggregate';
 export { PickByMinMaxStep } from './steps/pick-by-min-max';
 
+// Filter step
+export { FilterStep } from './steps/filter';
 

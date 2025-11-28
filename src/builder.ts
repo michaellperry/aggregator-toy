@@ -2,6 +2,7 @@ import { getPathNamesFromDescriptor, type ImmutableProps, type Pipeline, type St
 import { CommutativeAggregateStep, type AddOperator, type SubtractOperator } from './steps/commutative-aggregate';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
+import { FilterStep } from './steps/filter';
 import { GroupByStep } from './steps/group-by';
 import { NavigateToPath, TransformAtPath } from './types/path';
 import { MinMaxAggregateStep } from './steps/min-max-aggregate';
@@ -468,6 +469,37 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             this.lastStep,
             [...this.scopePath, ...pathSegments] as [...Path, ...NewPath]
         );
+    }
+
+    /**
+     * Filters items based on a predicate function.
+     * Only items that pass the predicate will be included in the output.
+     *
+     * This is a stateless implementation - no item storage required because:
+     * 1. Items are immutable
+     * 2. RemovedHandler receives immutableProps
+     * 3. Predicate re-evaluation is deterministic
+     *
+     * @param predicate - Function that returns true for items to include
+     * @returns A PipelineBuilder with the same type (filtering doesn't change shape)
+     *
+     * @example
+     * // Filter to only include items with price > 50
+     * .filter(item => item.price > 50)
+     *
+     * @example
+     * // Filter nested items within a scoped path
+     * .in('employees').filter(emp => emp.salary >= 50000)
+     */
+    filter(
+        predicate: (item: NavigateToPath<T, Path>) => boolean
+    ): PipelineBuilder<T, TStart, Path> {
+        const newStep = new FilterStep<NavigateToPath<T, Path>>(
+            this.lastStep,
+            predicate as (item: unknown) => boolean,
+            this.scopePath as string[]
+        );
+        return new PipelineBuilder(this.input, newStep, this.scopePath) as any;
     }
 
     getTypeDescriptor(): TypeDescriptor {

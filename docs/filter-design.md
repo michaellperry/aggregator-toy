@@ -238,84 +238,41 @@ createPipeline<{ category: string; value: number }>()
 
 **User Question**: "Given that the properties passed to the `added` handler are immutable, do we need to store the added keys to protect the downstream `removed` handlers?"
 
-This is a profound architectural question. The answer depends on whether `immutableProps` are available during removal events.
+This question led to a significant architectural improvement. The answer is **no** - we don't need per-step state tracking because `immutableProps` are now available during removal events.
 
-### 4.2 Current Handler Signatures
+### 4.2 Handler Signatures (Implemented)
 
 From [`src/pipeline.ts`](src/pipeline.ts:19):
 
 ```typescript
 export type AddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
-export type RemovedHandler = (path: string[], key: string) => void;  // No immutableProps!
+export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
 export type ModifiedHandler = (path: string[], key: string, name: string, value: any) => void;
 ```
 
-**Critical observation**: The `RemovedHandler` does NOT receive `immutableProps`. This is why steps like [`CommutativeAggregateStep`](src/steps/commutative-aggregate.ts:75) maintain an `itemStore` to retrieve item data during removal:
+**Key decision**: The `RemovedHandler` now receives `immutableProps`, matching the `AddedHandler` signature. This architectural change (documented in [`docs/removed-handler-immutable-props-design.md`](removed-handler-immutable-props-design.md)) enables stateless step implementations.
 
-```typescript
-// From CommutativeAggregateStep
-private itemStore: Map<string, ImmutableProps> = new Map();
-```
+### 4.3 Historical Context: Why State Tracking Was Originally Considered
 
-### 4.3 Analysis: Why State Tracking Was Originally Proposed
+An earlier design considered tracking `addedKeys: Set<string>` because:
 
-The original design proposed tracking `addedKeys: Set<string>` because:
+1. `onRemoved` originally only received `(path, key)` - not `immutableProps`
+2. Without the item data, we could not re-evaluate the predicate
+3. We needed to know if the item was forwarded downstream to decide whether to forward the removal
 
-1. `onRemoved` only receives `(path, key)` - not `immutableProps`
-2. Without the item data, we cannot re-evaluate the predicate
-3. We need to know if the item was forwarded downstream to decide whether to forward the removal
+This approach was rejected in favor of the API change that adds `immutableProps` to `RemovedHandler`.
 
 ### 4.4 The Immutability Guarantee
 
 The key insight is that **items are immutable**. This means:
 
 - The predicate result is **deterministic** - evaluating it at removal time yields the same result as at addition time
-- If we had access to `immutableProps` during removal, we could simply re-evaluate the predicate
-- **No state tracking would be needed**
+- With access to `immutableProps` during removal, we can simply re-evaluate the predicate
+- **No state tracking is needed**
 
-### 4.5 Design Options
+### 4.5 Implemented Design: Stateless FilterStep
 
-#### Option A: Stateful FilterStep (Original Design)
-
-```typescript
-class FilterStep<T> implements Step {
-    private addedKeys: Set<string> = new Set();  // State tracking
-    
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        this.input.onAdded(pathNames, (path, key, immutableProps) => {
-            if (this.predicate(immutableProps as T)) {
-                this.addedKeys.add(key);  // Track that this key was forwarded
-                handler(path, key, immutableProps);
-            }
-        });
-    }
-    
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        this.input.onRemoved(pathNames, (path, key) => {
-            if (this.addedKeys.has(key)) {  // Check tracking state
-                this.addedKeys.delete(key);
-                handler(path, key);
-            }
-        });
-    }
-}
-```
-
-**Trade-offs:**
-- ✅ Works with current `RemovedHandler` signature
-- ❌ Requires per-step state management
-- ❌ Duplicates pattern already in `CommutativeAggregateStep`
-
-#### Option B: Stateless FilterStep (Requires API Change)
-
-If we modify `RemovedHandler` to include `immutableProps`:
-
-```typescript
-// Modified signature
-export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
-```
-
-Then FilterStep becomes **stateless**:
+With the API change implemented (see [`docs/removed-handler-immutable-props-design.md`](removed-handler-immutable-props-design.md)), `FilterStep` is **stateless**:
 
 ```typescript
 class FilterStep<T> implements Step {
@@ -340,34 +297,32 @@ class FilterStep<T> implements Step {
 }
 ```
 
-**Trade-offs:**
+**Benefits of this approach:**
 - ✅ No per-step state needed
 - ✅ Simpler implementation
-- ✅ Would also simplify `CommutativeAggregateStep` (could remove `itemStore`)
-- ❌ Requires API change to `RemovedHandler`
-- ❌ Requires `InputPipeline` to store items
+- ✅ Consistent with other simplified aggregate steps
+- ✅ Centralized item storage in `InputPipeline`
 
-### 4.6 Comparison Table
+### 4.6 Architecture Summary
 
-| Aspect | Option A: Stateful | Option B: Stateless |
-|--------|-------------------|---------------------|
-| Handler signature | No change | `RemovedHandler` adds `immutableProps` |
-| FilterStep state | `addedKeys: Set<string>` | None |
-| CommutativeAggregateStep | Keeps `itemStore` | Could remove `itemStore` |
-| Item storage location | Distributed across steps | Centralized in `InputPipeline` |
-| Memory efficiency | Potentially duplicated | Single copy |
-| Determinism | Implicit - trust stored boolean | Explicit - predicate always re-evaluated |
+| Aspect | Implementation |
+|--------|---------------|
+| Handler signature | `RemovedHandler` includes `immutableProps` |
+| FilterStep state | None - stateless |
+| Item storage location | Centralized in `InputPipeline` |
+| Memory efficiency | Single copy of items |
+| Determinism | Explicit - predicate re-evaluated on removal |
 
-### 4.7 Recommended Design: Option B (Stateless)
+### 4.7 Design Decision: Stateless Implementation
 
-**Given the immutability guarantee, Option B is the cleaner architectural choice.**
+**The stateless design was chosen as the architectural approach.**
 
-The recommended approach involves a broader refactoring:
+The implementation centralizes item storage at the pipeline input level:
 
-1. **Modify [`RemovedHandler`](src/pipeline.ts:21) signature** to include `immutableProps`
-2. **Update [`InputPipeline`](src/factory.ts:6)** to store items and pass them during removal
-3. **Simplify `FilterStep`** - no state tracking needed
-4. **Optionally simplify [`CommutativeAggregateStep`](src/steps/commutative-aggregate.ts:75)** - remove `itemStore`
+1. **[`RemovedHandler`](src/pipeline.ts:21) signature** includes `immutableProps` ✅
+2. **[`InputPipeline`](src/factory.ts:6)** stores items and passes them during removal ✅
+3. **`FilterStep`** - no state tracking needed ✅
+4. **Aggregate steps** simplified - `itemStore` removed ✅
 
 This centralizes item storage at the pipeline input level rather than duplicating it across multiple steps.
 
@@ -532,37 +487,35 @@ flowchart TD
 
 ---
 
-## 6. Required API Changes
+## 6. API Implementation Reference
 
-### 6.1 RemovedHandler Signature Update
+### 6.1 RemovedHandler Signature (Implemented)
 
-In [`src/pipeline.ts`](src/pipeline.ts:21), update:
+In [`src/pipeline.ts`](src/pipeline.ts:21):
 
 ```typescript
-// Current
-export type RemovedHandler = (path: string[], key: string) => void;
-
-// Updated
 export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
 ```
 
-### 6.2 InputPipeline Storage Update
+This matches the `AddedHandler` signature, providing symmetry in the API.
 
-In [`src/factory.ts`](src/factory.ts:6), the `InputPipeline` class needs to store items:
+### 6.2 InputPipeline Item Storage (Implemented)
+
+In [`src/factory.ts`](src/factory.ts:6), the `InputPipeline` class stores items:
 
 ```typescript
 class InputPipeline<T> implements Pipeline<T>, Step {
     private addedHandlers: AddedHandler[] = [];
     private removedHandlers: RemovedHandler[] = [];
-    private items: Map<string, T> = new Map();  // NEW: Store items
+    private items: Map<string, T> = new Map();  // Stores items for removal
 
     add(key: string, immutableProps: T): void {
-        this.items.set(key, immutableProps);  // NEW: Store for later removal
+        this.items.set(key, immutableProps);  // Store for later removal
         this.addedHandlers.forEach(handler => handler([], key, immutableProps as ImmutableProps));
     }
 
     remove(key: string): void {
-        const immutableProps = this.items.get(key);  // NEW: Retrieve stored item
+        const immutableProps = this.items.get(key);
         if (immutableProps !== undefined) {
             this.items.delete(key);
             this.removedHandlers.forEach(handler => handler([], key, immutableProps as ImmutableProps));
@@ -572,13 +525,15 @@ class InputPipeline<T> implements Pipeline<T>, Step {
 }
 ```
 
-### 6.3 Impact on Existing Steps
+### 6.3 Impact on Steps (Implemented)
 
-Steps that currently call `onRemoved` handlers need to pass `immutableProps`:
+All steps that handle `onRemoved` events now receive `immutableProps`:
 
-- **[`GroupByStep`](src/steps/group-by.ts)**: Needs to store and forward immutableProps
-- **[`CommutativeAggregateStep`](src/steps/commutative-aggregate.ts)**: Can remove `itemStore`, use passed immutableProps
-- **New `FilterStep`**: Stateless, uses passed immutableProps
+- **[`GroupByStep`](src/steps/group-by.ts)**: Receives and forwards `immutableProps`
+- **[`CommutativeAggregateStep`](src/steps/commutative-aggregate.ts)**: Uses passed `immutableProps`, no `itemStore` needed
+- **`FilterStep`**: Stateless implementation, re-evaluates predicate using `immutableProps`
+
+For full details on the API change, see [`docs/removed-handler-immutable-props-design.md`](removed-handler-immutable-props-design.md).
 
 ---
 
@@ -840,22 +795,26 @@ src/
 
 ---
 
-## 13. Implementation Order
+## 13. Implementation Status
 
-Given the broader architectural changes needed, the recommended implementation order is:
+The prerequisite API changes have been completed:
 
-1. **Update `RemovedHandler` signature** in [`src/pipeline.ts`](src/pipeline.ts:21)
-2. **Update `InputPipeline`** in [`src/factory.ts`](src/factory.ts:6) to store and pass items
-3. **Update existing steps** that forward removal events (e.g., [`GroupByStep`](src/steps/group-by.ts))
-4. **Optionally simplify [`CommutativeAggregateStep`](src/steps/commutative-aggregate.ts)** to remove `itemStore`
-5. **Implement `FilterStep`** with the stateless design
-6. **Add comprehensive tests**
+1. ✅ **Updated `RemovedHandler` signature** in [`src/pipeline.ts`](src/pipeline.ts:21)
+2. ✅ **Updated `InputPipeline`** in [`src/factory.ts`](src/factory.ts:6) to store and pass items
+3. ✅ **Updated existing steps** that forward removal events (e.g., [`GroupByStep`](src/steps/group-by.ts))
+4. ✅ **Simplified aggregate steps** to use passed `immutableProps`
+
+**Remaining for FilterStep:**
+5. ⏳ **Implement `FilterStep`** with the stateless design
+6. ⏳ **Add comprehensive tests**
+
+See [`docs/removed-handler-immutable-props-design.md`](removed-handler-immutable-props-design.md) for details on the completed API changes.
 
 ---
 
 ## 14. Summary
 
-The `filter` operation provides a clean, type-safe way to exclude items from a pipeline based on a predicate function. Following analysis of the immutability guarantee, the design has been simplified:
+The `filter` operation provides a clean, type-safe way to exclude items from a pipeline based on a predicate function. Following the decision to add `immutableProps` to `RemovedHandler`, the design uses a stateless approach:
 
 - **Stateless implementation** - No `addedKeys` tracking needed due to immutability
 - **Preserves type shape** - Output type matches input type
@@ -864,6 +823,15 @@ The `filter` operation provides a clean, type-safe way to exclude items from a p
 - **Integrates seamlessly** - Follows existing patterns for step implementation
 - **Is composable** - Works well with groupBy, aggregates, and other operations
 
-**Key insight**: The user's question revealed that by passing `immutableProps` in `RemovedHandler`, individual steps like `FilterStep` can be stateless. The predicate result is deterministic for immutable data, so re-evaluation at removal time yields the same result as at addition time.
+**Architectural decision**: By passing `immutableProps` in `RemovedHandler` (see [`docs/removed-handler-immutable-props-design.md`](removed-handler-immutable-props-design.md)), individual steps like `FilterStep` can be stateless. The predicate result is deterministic for immutable data, so re-evaluation at removal time yields the same result as at addition time.
 
 This approach centralizes item storage at the pipeline input level and eliminates duplicated state management across multiple steps, resulting in a cleaner and more maintainable architecture.
+
+### Immutable Properties Available in Remove Handlers
+
+When implementing `FilterStep`, the `onRemoved` handler receives:
+- `path: string[]` - The path to the item
+- `key: string` - The unique key of the item
+- `immutableProps: ImmutableProps` - All properties that were passed when the item was added
+
+This enables the stateless re-evaluation of the filter predicate during removal events.

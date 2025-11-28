@@ -13,12 +13,12 @@ type ExtractKeyedArrays<T> = T extends KeyedArray<infer U>
       }
     : T;
 
-export type BuilderOutputType<T> = T extends PipelineBuilder<infer U, any> 
-    ? ExtractKeyedArrays<U> 
+export type BuilderOutputType<T> = T extends PipelineBuilder<infer U, any, any>
+    ? ExtractKeyedArrays<U>
     : never;
 
 // Helper function that uses type inference to set up a test pipeline
-export function createTestPipeline<TBuilder extends PipelineBuilder<any, any>>(
+export function createTestPipeline<TBuilder extends PipelineBuilder<any, any, any>>(
     builderFactory: () => TBuilder
 ): [Pipeline<any>, () => BuilderOutputType<TBuilder>[]] {
     const builder = builderFactory();
