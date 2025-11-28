@@ -92,13 +92,16 @@ describe('pipeline groupBy', () => {
                 .groupBy(['category'], 'items')
         );
 
-        pipeline.add("item1", { category: 'A', value: 10 });
-        pipeline.add("item2", { category: 'A', value: 20 });
-        pipeline.add("item3", { category: 'A', value: 30 });
+        const item1 = { category: 'A', value: 10 };
+        const item2 = { category: 'A', value: 20 };
+        const item3 = { category: 'A', value: 30 };
+        pipeline.add("item1", item1);
+        pipeline.add("item2", item2);
+        pipeline.add("item3", item3);
 
         expect(getOutput()[0].items.length).toBe(3);
 
-        pipeline.remove("item2");
+        pipeline.remove("item2", item2);
 
         const output = getOutput();
         expect(output.length).toBe(1);
@@ -114,12 +117,14 @@ describe('pipeline groupBy', () => {
                 .groupBy(['category'], 'items')
         );
 
-        pipeline.add("item1", { category: 'A', value: 10 });
-        pipeline.add("item2", { category: 'B', value: 20 });
+        const item1 = { category: 'A', value: 10 };
+        const item2 = { category: 'B', value: 20 };
+        pipeline.add("item1", item1);
+        pipeline.add("item2", item2);
 
         expect(getOutput().length).toBe(2);
 
-        pipeline.remove("item1");
+        pipeline.remove("item1", item1);
 
         const output = getOutput();
         expect(output.length).toBe(1);

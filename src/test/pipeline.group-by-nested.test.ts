@@ -112,12 +112,14 @@ describe('pipeline groupBy nested', () => {
                 .groupBy(['state'], 'cities')
         );
 
-        pipeline.add("town1", { state: 'TX', city: 'Dallas', town: 'Plano', population: 1000000 });
-        pipeline.add("town2", { state: 'TX', city: 'Dallas', town: 'Richardson', population: 2000000 });
+        const town1 = { state: 'TX', city: 'Dallas', town: 'Plano', population: 1000000 };
+        const town2 = { state: 'TX', city: 'Dallas', town: 'Richardson', population: 2000000 };
+        pipeline.add("town1", town1);
+        pipeline.add("town2", town2);
         
         expect(getOutput()[0].cities[0].towns).toHaveLength(2);
         
-        pipeline.remove("town2");
+        pipeline.remove("town2", town2);
         
         const output = getOutput();
         expect(output[0].cities[0].towns).toHaveLength(1);
@@ -132,16 +134,19 @@ describe('pipeline groupBy nested', () => {
         );
 
         // Add multiple towns to Dallas (to deplete it later)
-        pipeline.add("town1", { state: 'TX', city: 'Dallas', town: 'Plano', population: 1000000 });
-        pipeline.add("town2", { state: 'TX', city: 'Dallas', town: 'Richardson', population: 2000000 });
+        const town1 = { state: 'TX', city: 'Dallas', town: 'Plano', population: 1000000 };
+        const town2 = { state: 'TX', city: 'Dallas', town: 'Richardson', population: 2000000 };
         // Add a town to Houston (to keep it around)
-        pipeline.add("town3", { state: 'TX', city: 'Houston', town: 'Houston', population: 5000000 });
+        const town3 = { state: 'TX', city: 'Houston', town: 'Houston', population: 5000000 };
+        pipeline.add("town1", town1);
+        pipeline.add("town2", town2);
+        pipeline.add("town3", town3);
         
         expect(getOutput()[0].cities).toHaveLength(2);
         
         // Remove all towns from Dallas to deplete the Dallas city group
-        pipeline.remove("town1");
-        pipeline.remove("town2");
+        pipeline.remove("town1", town1);
+        pipeline.remove("town2", town2);
         
         const output = getOutput();
         // Dallas city group should be removed, Houston should remain
@@ -203,14 +208,16 @@ describe('pipeline groupBy nested', () => {
                 .groupBy(['state'], 'cities')
         );
 
-        pipeline.add("town1", { state: 'TX', city: 'Dallas', town: 'Plano', population: 1000000 });
-        pipeline.add("town2", { state: 'TX', city: 'Houston', town: 'Houston', population: 5000000 });
+        const town1 = { state: 'TX', city: 'Dallas', town: 'Plano', population: 1000000 };
+        const town2 = { state: 'TX', city: 'Houston', town: 'Houston', population: 5000000 };
+        pipeline.add("town1", town1);
+        pipeline.add("town2", town2);
         
         expect(getOutput().length).toBe(1);
         expect(getOutput()[0].cities).toHaveLength(2);
         
-        pipeline.remove("town1");
-        pipeline.remove("town2");
+        pipeline.remove("town1", town1);
+        pipeline.remove("town2", town2);
         
         const output = getOutput();
         expect(output.length).toBe(0);

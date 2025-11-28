@@ -25,9 +25,12 @@ describe('pipeline defineProperty', () => {
                 .defineProperty("sum", (item) => item.a + item.b)
         );
 
-        pipeline.add("item1", { a: 2, b: 5 });
-        pipeline.add("item2", { a: 4, b: -1 });
-        pipeline.add("item3", { a: 10, b: 20 });
+        const item1 = { a: 2, b: 5 };
+        const item2 = { a: 4, b: -1 };
+        const item3 = { a: 10, b: 20 };
+        pipeline.add("item1", item1);
+        pipeline.add("item2", item2);
+        pipeline.add("item3", item3);
 
         expect(getOutput()).toEqual([
             { a: 2, b: 5, sum: 7 },
@@ -35,7 +38,7 @@ describe('pipeline defineProperty', () => {
             { a: 10, b: 20, sum: 30 }
         ]);
 
-        pipeline.remove("item2");
+        pipeline.remove("item2", item2);
 
         expect(getOutput()).toEqual([
             { a: 2, b: 5, sum: 7 },

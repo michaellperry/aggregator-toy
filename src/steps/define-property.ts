@@ -26,8 +26,16 @@ export class DefinePropertyStep<T, K extends string, U> implements Step {
         }
     }
     
-    onRemoved(pathNames: string[], handler: (path: string[], key: string) => void): void {
-        this.input.onRemoved(pathNames, handler);
+    onRemoved(pathNames: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
+        if (this.isAtScopePath(pathNames)) {
+            // Apply the property transformation at the scoped level (for removal too)
+            this.input.onRemoved(pathNames, (path, key, immutableProps) => {
+                handler(path, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps as T) } as T & Record<K, U>);
+            });
+        } else {
+            // Pass through unchanged when not at scope path
+            this.input.onRemoved(pathNames, handler);
+        }
     }
 
     onModified(pathNames: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {

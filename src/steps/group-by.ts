@@ -25,8 +25,8 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         this.input.onAdded(this.scopePath, (path, key, immutableProps) => {
             this.handleAdded(path, key, immutableProps);
         });
-        this.input.onRemoved(this.scopePath, (path, key) => {
-            this.handleRemoved(path, key);
+        this.input.onRemoved(this.scopePath, (path, key, immutableProps) => {
+            this.handleRemoved(path, key, immutableProps);
         });
     }
 
@@ -127,7 +127,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             const shiftedPath = pathNames.slice(scopeAndArrayPath.length);
             
             // Register interceptor with input at scope path + shifted path
-            this.input.onRemoved([...this.scopePath, ...shiftedPath], (notifiedPath, key) => {
+            this.input.onRemoved([...this.scopePath, ...shiftedPath], (notifiedPath, key, immutableProps) => {
                 const itemHash = notifiedPath[this.scopePath.length];
                 const groupHash = this.keyToGroupHash.get(itemHash);
                 if (groupHash === undefined) {
@@ -138,7 +138,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
                     groupHash,
                     ...notifiedPath.slice(this.scopePath.length)
                 ];
-                handler(modifiedPath, key);
+                handler(modifiedPath, key, immutableProps);
             });
         } else {
             this.input.onRemoved(pathNames, handler);
@@ -231,7 +231,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         this.itemAddedHandlers.forEach(handler => handler([...parentPath, keyHash], key, nonKeyProps));
     }
 
-    private handleRemoved(path: string[], key: string) {
+    private handleRemoved(path: string[], key: string, immutableProps: ImmutableProps) {
         // Get the parent path for this key
         const parentPath = this.keyToParentPath.get(key) || path;
         
@@ -241,8 +241,16 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             throw new Error(`GroupByStep: item with key "${key}" not found`);
         }
         
+        // Extract the non-key properties from the object for item handlers
+        let nonKeyProps: ImmutableProps = {};
+        Object.keys(immutableProps).forEach(prop => {
+            if (!this.keyProperties.includes(prop as K)) {
+                nonKeyProps[prop] = immutableProps[prop];
+            }
+        });
+        
         // Notify item removed handlers at parent path + keyHash
-        this.itemRemovedHandlers.forEach(handler => handler([...parentPath, keyHash], key));
+        this.itemRemovedHandlers.forEach(handler => handler([...parentPath, keyHash], key, nonKeyProps));
         
         // Remove key from tracking
         this.keyToGroupHash.delete(key);
@@ -255,8 +263,16 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
             
             // Check if group is empty
             if (groupKeys.size === 0) {
+                // Extract the key properties from the object for group handlers
+                let keyProps: ImmutableProps = {};
+                Object.keys(immutableProps).forEach(prop => {
+                    if (this.keyProperties.includes(prop as K)) {
+                        keyProps[prop] = immutableProps[prop];
+                    }
+                });
+                
                 // Notify group removed handlers at parent path
-                this.groupRemovedHandlers.forEach(handler => handler(parentPath, keyHash));
+                this.groupRemovedHandlers.forEach(handler => handler(parentPath, keyHash, keyProps));
                 
                 // Clean up tracking
                 this.groupToKeys.delete(keyHash);

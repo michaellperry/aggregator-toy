@@ -42,8 +42,9 @@ describe('Aggregate Functions', () => {
                     .sum('items', 'price', 'totalPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', price: 100 };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -74,15 +75,18 @@ describe('Aggregate Functions', () => {
                     .sum('items', 'price', 'totalPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 200 });
-            pipeline.add('item3', { category: 'A', price: 300 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 200 };
+            const item3 = { category: 'A', price: 300 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.totalPrice).toBe(600);
 
-            pipeline.remove('item2');
+            pipeline.remove('item2', item2);
 
             output = getOutput();
             group = output.find(g => g.category === 'A');
@@ -114,8 +118,9 @@ describe('Aggregate Functions', () => {
                     .count('items', 'itemCount')
             );
 
-            pipeline.add('item1', { category: 'A', itemName: 'Item' });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', itemName: 'Item' };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -128,17 +133,19 @@ describe('Aggregate Functions', () => {
                     .count('items', 'itemCount')
             );
 
-            pipeline.add('item1', { category: 'A', itemName: 'Item1' });
+            const item1 = { category: 'A', itemName: 'Item1' };
+            const item2 = { category: 'A', itemName: 'Item2' };
+            pipeline.add('item1', item1);
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.itemCount).toBe(1);
 
-            pipeline.add('item2', { category: 'A', itemName: 'Item2' });
+            pipeline.add('item2', item2);
             output = getOutput();
             group = output.find(g => g.category === 'A');
             expect(group?.itemCount).toBe(2);
 
-            pipeline.remove('item1');
+            pipeline.remove('item1', item1);
             output = getOutput();
             group = output.find(g => g.category === 'A');
             expect(group?.itemCount).toBe(1);
@@ -190,8 +197,9 @@ describe('Aggregate Functions', () => {
                     .min('items', 'price', 'minPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', price: 100 };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -221,15 +229,18 @@ describe('Aggregate Functions', () => {
                     .min('items', 'price', 'minPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 50 });
-            pipeline.add('item3', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 50 };
+            const item3 = { category: 'A', price: 200 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.minPrice).toBe(50);
 
-            pipeline.remove('item2'); // Remove the minimum
+            pipeline.remove('item2', item2); // Remove the minimum
 
             output = getOutput();
             group = output.find(g => g.category === 'A');
@@ -279,8 +290,9 @@ describe('Aggregate Functions', () => {
                     .max('items', 'price', 'maxPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', price: 100 };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -310,15 +322,18 @@ describe('Aggregate Functions', () => {
                     .max('items', 'price', 'maxPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 50 });
-            pipeline.add('item3', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 50 };
+            const item3 = { category: 'A', price: 200 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.maxPrice).toBe(200);
 
-            pipeline.remove('item3'); // Remove the maximum
+            pipeline.remove('item3', item3); // Remove the maximum
 
             output = getOutput();
             group = output.find(g => g.category === 'A');
@@ -368,8 +383,9 @@ describe('Aggregate Functions', () => {
                     .average('items', 'price', 'avgPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', price: 100 };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -382,17 +398,19 @@ describe('Aggregate Functions', () => {
                     .average('items', 'price', 'avgPrice')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 200 };
+            pipeline.add('item1', item1);
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.avgPrice).toBe(100);
 
-            pipeline.add('item2', { category: 'A', price: 200 });
+            pipeline.add('item2', item2);
             output = getOutput();
             group = output.find(g => g.category === 'A');
             expect(group?.avgPrice).toBe(150); // (100 + 200) / 2
 
-            pipeline.remove('item1');
+            pipeline.remove('item1', item1);
             output = getOutput();
             group = output.find(g => g.category === 'A');
             expect(group?.avgPrice).toBe(200); // 200 / 1

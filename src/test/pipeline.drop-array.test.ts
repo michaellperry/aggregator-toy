@@ -158,13 +158,14 @@ describe('pipeline dropProperty event suppression (for arrays)', () => {
         );
         
         // Add items - these won't appear because add events are suppressed
-        pipeline2.add("item3", { category: 'B', value: 30 });
+        const item3 = { category: 'B', value: 30 };
+        pipeline2.add("item3", item3);
         let output2 = getOutput2() as Array<{ category?: string; items?: unknown }>;
         
         // Remove items - remove events at ['items'] should be suppressed
         // Since the type descriptor doesn't include ['items'], handlers aren't registered
         // for that path, so remove events won't affect the output
-        pipeline2.remove("item3");
+        pipeline2.remove("item3", item3);
         
         const outputAfterRemove = getOutput2() as Array<{ category?: string; items?: unknown }>;
         // Output should be unchanged (items were never added due to suppressed add events)
@@ -183,14 +184,16 @@ describe('pipeline dropProperty event suppression (for arrays)', () => {
         );
 
         // Add items - add events are suppressed, so items won't be added
-        pipeline.add("item1", { category: 'A', value: 10 });
-        pipeline.add("item2", { category: 'A', value: 20 });
+        const item1 = { category: 'A', value: 10 };
+        const item2 = { category: 'A', value: 20 };
+        pipeline.add("item1", item1);
+        pipeline.add("item2", item2);
         
         let output = getOutput() as Array<{ category?: string; items?: unknown }>;
         
         // Modify items (by removing and re-adding with different values)
         // Modify events at ['items'] should be suppressed
-        pipeline.remove("item1");
+        pipeline.remove("item1", item1);
         pipeline.add("item1", { category: 'A', value: 15 }); // Changed value
         
         // Output should not change because modify events at ['items'] are suppressed
@@ -302,7 +305,7 @@ describe('pipeline dropProperty integration (for arrays)', () => {
         expect(groupB?.items).toBeUndefined();
         
         // Remove an item - aggregate should update
-        pipeline.remove("item1");
+        pipeline.remove("item1", { category: 'A', value: 10 });
         const outputAfterRemove = getOutput() as Array<{ category: string; total: number; items?: unknown }>;
         const groupAAfter = outputAfterRemove.find(g => g.category === 'A');
         expect(groupAAfter?.total).toBe(20); // Updated aggregate

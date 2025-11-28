@@ -1,6 +1,6 @@
 export interface Pipeline<T> {
     add(key: string, immutableProps: T): void;
-    remove(key: string): void;
+    remove(key: string, immutableProps: T): void;
 }
 
 export interface TypeDescriptor {
@@ -18,7 +18,7 @@ export type ImmutableProps = {
 
 export type AddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
 
-export type RemovedHandler = (path: string[], key: string) => void;
+export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
 
 export type ModifiedHandler = (path: string[], key: string, name: string, value: any) => void;
 

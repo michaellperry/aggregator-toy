@@ -25,9 +25,12 @@ describe('pipeline dropProperty', () => {
                 .dropProperty("c")
         );
 
-        pipeline.add("item1", { a: 2, b: 5, c: "test" });
-        pipeline.add("item2", { a: 4, b: -1, c: "foo" });
-        pipeline.add("item3", { a: 10, b: 20, c: "bar" });
+        const item1 = { a: 2, b: 5, c: "test" };
+        const item2 = { a: 4, b: -1, c: "foo" };
+        const item3 = { a: 10, b: 20, c: "bar" };
+        pipeline.add("item1", item1);
+        pipeline.add("item2", item2);
+        pipeline.add("item3", item3);
 
         expect(getOutput()).toEqual([
             { a: 2, b: 5 },
@@ -35,7 +38,7 @@ describe('pipeline dropProperty', () => {
             { a: 10, b: 20 }
         ]);
 
-        pipeline.remove("item2");
+        pipeline.remove("item2", item2);
 
         expect(getOutput()).toEqual([
             { a: 2, b: 5 },

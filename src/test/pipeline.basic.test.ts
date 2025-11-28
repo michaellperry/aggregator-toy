@@ -23,9 +23,12 @@ describe('pipeline basic operations', () => {
             createPipeline<{ message: string }>()
         );
 
-        pipeline.add("item1", { message: "Hello" });
-        pipeline.add("item2", { message: "Goodbye" });
-        pipeline.add("item3", { message: "See you" });
+        const item1 = { message: "Hello" };
+        const item2 = { message: "Goodbye" };
+        const item3 = { message: "See you" };
+        pipeline.add("item1", item1);
+        pipeline.add("item2", item2);
+        pipeline.add("item3", item3);
 
         expect(getOutput()).toEqual([
             { message: "Hello" },
@@ -33,7 +36,7 @@ describe('pipeline basic operations', () => {
             { message: "See you" }
         ]);
 
-        pipeline.remove("item2");
+        pipeline.remove("item2", item2);
 
         expect(getOutput()).toEqual([
             { message: "Hello" },

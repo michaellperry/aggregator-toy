@@ -49,7 +49,7 @@ export class PickByMinMaxStep<
     TPropertyName extends string
 > implements Step {
     
-    /** Maps item path hash to item data for removal lookup */
+    /** Maps item path hash to item data (needed for recalculation when picked item is removed) */
     private itemStore: Map<string, ImmutableProps> = new Map();
     
     /** Maps parent path hash to current min/max item */
@@ -76,8 +76,8 @@ export class PickByMinMaxStep<
             this.handleItemAdded(path, key, immutableProps);
         });
         
-        this.input.onRemoved(this.arrayPath, (path, key) => {
-            this.handleItemRemoved(path, key);
+        this.input.onRemoved(this.arrayPath, (path, key, immutableProps) => {
+            this.handleItemRemoved(path, key, immutableProps);
         });
     }
     
@@ -168,19 +168,13 @@ export class PickByMinMaxStep<
     /**
      * Handle when an item is removed from the target array
      */
-    private handleItemRemoved(runtimePath: string[], itemKey: string): void {
+    private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
         const parentPath = runtimePath;
         const parentHash = computePathHash(parentPath);
         const itemPath = [...runtimePath, itemKey];
         const itemHash = computePathHash(itemPath);
         
-        // Lookup stored item data
-        const item = this.itemStore.get(itemHash);
-        if (!item) {
-            throw new Error(`Item ${itemKey} not found in item store`);
-        }
-        
-        // Remove from tracking
+        // Remove from tracking (needed for recalculation)
         this.itemStore.delete(itemHash);
         
         // Check if the removed item was the current picked item

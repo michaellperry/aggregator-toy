@@ -40,8 +40,9 @@ describe('pickByMin', () => {
                     .pickByMin('items', 'price', 'cheapestItem')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', price: 100 };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -207,15 +208,18 @@ describe('pickByMin', () => {
                     .pickByMin('items', 'price', 'cheapestItem')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 50 });
-            pipeline.add('item3', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 50 };
+            const item3 = { category: 'A', price: 200 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.cheapestItem?.price).toBe(50);
 
-            pipeline.remove('item2'); // Remove the minimum
+            pipeline.remove('item2', item2); // Remove the minimum
 
             output = getOutput();
             group = output.find(g => g.category === 'A');
@@ -229,16 +233,20 @@ describe('pickByMin', () => {
                     .pickByMin('items', 'price', 'cheapestItem')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 50 });
-            pipeline.add('item3', { category: 'A', price: 75 });
-            pipeline.add('item4', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 50 };
+            const item3 = { category: 'A', price: 75 };
+            const item4 = { category: 'A', price: 200 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
+            pipeline.add('item4', item4);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.cheapestItem?.price).toBe(50);
 
-            pipeline.remove('item2'); // Remove minimum
+            pipeline.remove('item2', item2); // Remove minimum
 
             output = getOutput();
             group = output.find(g => g.category === 'A');
@@ -252,15 +260,18 @@ describe('pickByMin', () => {
                     .pickByMin('items', 'price', 'cheapestItem')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 50 });
-            pipeline.add('item3', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 50 };
+            const item3 = { category: 'A', price: 200 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.cheapestItem?.price).toBe(50);
 
-            pipeline.remove('item3'); // Remove non-minimum
+            pipeline.remove('item3', item3); // Remove non-minimum
 
             output = getOutput();
             group = output.find(g => g.category === 'A');
@@ -478,8 +489,9 @@ describe('pickByMin', () => {
                     .pickByMax('items', 'price', 'mostExpensiveItem')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.remove('item1');
+            const item1 = { category: 'A', price: 100 };
+            pipeline.add('item1', item1);
+            pipeline.remove('item1', item1);
 
             const output = getOutput();
             expect(output.length).toBe(0);
@@ -510,15 +522,18 @@ describe('pickByMin', () => {
                     .pickByMax('items', 'price', 'mostExpensiveItem')
             );
 
-            pipeline.add('item1', { category: 'A', price: 100 });
-            pipeline.add('item2', { category: 'A', price: 200 });
-            pipeline.add('item3', { category: 'A', price: 50 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 200 };
+            const item3 = { category: 'A', price: 50 };
+            pipeline.add('item1', item1);
+            pipeline.add('item2', item2);
+            pipeline.add('item3', item3);
 
             let output = getOutput();
             let group = output.find(g => g.category === 'A');
             expect(group?.mostExpensiveItem?.price).toBe(200);
 
-            pipeline.remove('item2'); // Remove the maximum
+            pipeline.remove('item2', item2); // Remove the maximum
 
             output = getOutput();
             group = output.find(g => g.category === 'A');

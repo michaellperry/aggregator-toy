@@ -126,18 +126,20 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
-            inputPipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
-            inputPipeline.add('item2', { category: 'Electronics', itemName: 'Laptop', price: 1200 });
+            const item1 = { category: 'Electronics', itemName: 'Phone', price: 500 };
+            const item2 = { category: 'Electronics', itemName: 'Laptop', price: 1200 };
+            inputPipeline.add('item1', item1);
+            inputPipeline.add('item2', item2);
             
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(1700);
             
             // Remove item1 (price: 500)
-            inputPipeline.remove('item1');
+            inputPipeline.remove('item1', item1);
             
             // Verify aggregate reduced
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(1200);
@@ -163,16 +165,18 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ name, value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
-            inputPipeline.add('item1', { category: 'A', price: 100 });
-            inputPipeline.add('item2', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 200 };
+            inputPipeline.add('item1', item1);
+            inputPipeline.add('item2', item2);
             
             const countBeforeRemove = modifiedEvents.length;
-            inputPipeline.remove('item1');
+            inputPipeline.remove('item1', item1);
             
             // A new modified event should be emitted
             expect(modifiedEvents.length).toBe(countBeforeRemove + 1);
@@ -200,16 +204,18 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
-            inputPipeline.add('item1', { category: 'A', price: 100 });
-            inputPipeline.add('item2', { category: 'A', price: 200 });
+            const item1 = { category: 'A', price: 100 };
+            const item2 = { category: 'A', price: 200 };
+            inputPipeline.add('item1', item1);
+            inputPipeline.add('item2', item2);
             
-            inputPipeline.remove('item1');
-            inputPipeline.remove('item2');
+            inputPipeline.remove('item1', item1);
+            inputPipeline.remove('item2', item2);
             
             // Final aggregate should be 0
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(0);
@@ -274,18 +280,21 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ key, value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
             // Add employees to two departments
-            inputPipeline.add('emp1', { department: 'Engineering', employee: 'Alice', salary: 100000 });
-            inputPipeline.add('emp2', { department: 'Sales', employee: 'Bob', salary: 80000 });
-            inputPipeline.add('emp3', { department: 'Engineering', employee: 'Carol', salary: 120000 });
+            const emp1 = { department: 'Engineering', employee: 'Alice', salary: 100000 };
+            const emp2 = { department: 'Sales', employee: 'Bob', salary: 80000 };
+            const emp3 = { department: 'Engineering', employee: 'Carol', salary: 120000 };
+            inputPipeline.add('emp1', emp1);
+            inputPipeline.add('emp2', emp2);
+            inputPipeline.add('emp3', emp3);
             
             // Remove from Engineering
-            inputPipeline.remove('emp1');
+            inputPipeline.remove('emp1', emp1);
             
             // Check Sales total is unchanged (80000)
             // Check Engineering total is now 120000
@@ -519,16 +528,17 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
-            inputPipeline.add('item1', { category: 'A', value: 42 });
+            const item1 = { category: 'A', value: 42 };
+            inputPipeline.add('item1', item1);
             
             expect(modifiedEvents[0].value).toBe(42);
             
-            inputPipeline.remove('item1');
+            inputPipeline.remove('item1', item1);
             
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(0);
         });
@@ -584,18 +594,20 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
-            inputPipeline.add('item1', { category: 'A', value: 100 });
-            inputPipeline.add('item2', { category: 'A', value: -30 });
+            const item1 = { category: 'A', value: 100 };
+            const item2 = { category: 'A', value: -30 };
+            inputPipeline.add('item1', item1);
+            inputPipeline.add('item2', item2);
             
             expect(modifiedEvents[0].value).toBe(100);
             expect(modifiedEvents[1].value).toBe(70);
             
-            inputPipeline.remove('item2');
+            inputPipeline.remove('item2', item2);
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(100);
         });
     });
@@ -821,20 +833,23 @@ describe('CommutativeAggregateStep', () => {
                 modifiedEvents.push({ value });
             });
             
-            const inputPipeline = builder['input'] as { 
+            const inputPipeline = builder['input'] as {
                 add: (key: string, props: any) => void;
-                remove: (key: string) => void;
+                remove: (key: string, props: any) => void;
             };
             
-            inputPipeline.add('item1', { category: 'A', name: 'First' });
-            inputPipeline.add('item2', { category: 'A', name: 'Second' });
-            inputPipeline.add('item3', { category: 'A', name: 'Third' });
+            const item1 = { category: 'A', name: 'First' };
+            const item2 = { category: 'A', name: 'Second' };
+            const item3 = { category: 'A', name: 'Third' };
+            inputPipeline.add('item1', item1);
+            inputPipeline.add('item2', item2);
+            inputPipeline.add('item3', item3);
             
             expect(modifiedEvents[0].value).toBe(1);
             expect(modifiedEvents[1].value).toBe(2);
             expect(modifiedEvents[2].value).toBe(3);
             
-            inputPipeline.remove('item2');
+            inputPipeline.remove('item2', item2);
             
             expect(modifiedEvents[modifiedEvents.length - 1].value).toBe(2);
         });
@@ -898,14 +913,16 @@ describe('CommutativeAggregateStep', () => {
                         )
                 );
 
-                pipeline.add('item1', { category: 'Electronics', itemName: 'Phone', price: 500 });
-                pipeline.add('item2', { category: 'Electronics', itemName: 'Laptop', price: 1200 });
+                const item1 = { category: 'Electronics', itemName: 'Phone', price: 500 };
+                const item2 = { category: 'Electronics', itemName: 'Laptop', price: 1200 };
+                pipeline.add('item1', item1);
+                pipeline.add('item2', item2);
 
                 let output = getOutput();
                 let group = output.find(g => g.category === 'Electronics');
                 expect(group?.totalPrice).toBe(1700);
 
-                pipeline.remove('item1');
+                pipeline.remove('item1', item1);
 
                 output = getOutput();
                 group = output.find(g => g.category === 'Electronics');
@@ -924,11 +941,13 @@ describe('CommutativeAggregateStep', () => {
                         )
                 );
 
-                pipeline.add('item1', { category: 'A', price: 100 });
-                pipeline.add('item2', { category: 'A', price: 200 });
+                const item1 = { category: 'A', price: 100 };
+                const item2 = { category: 'A', price: 200 };
+                pipeline.add('item1', item1);
+                pipeline.add('item2', item2);
 
-                pipeline.remove('item1');
-                pipeline.remove('item2');
+                pipeline.remove('item1', item1);
+                pipeline.remove('item2', item2);
 
                 const output = getOutput();
                 // Group should be removed when all items are removed
@@ -974,9 +993,12 @@ describe('CommutativeAggregateStep', () => {
                         )
                 );
 
-                pipeline.add('emp1', { department: 'Engineering', employee: 'Alice', salary: 100000 });
-                pipeline.add('emp2', { department: 'Sales', employee: 'Bob', salary: 80000 });
-                pipeline.add('emp3', { department: 'Engineering', employee: 'Carol', salary: 120000 });
+                const emp1 = { department: 'Engineering', employee: 'Alice', salary: 100000 };
+                const emp2 = { department: 'Sales', employee: 'Bob', salary: 80000 };
+                const emp3 = { department: 'Engineering', employee: 'Carol', salary: 120000 };
+                pipeline.add('emp1', emp1);
+                pipeline.add('emp2', emp2);
+                pipeline.add('emp3', emp3);
 
                 let output = getOutput();
                 let engineeringGroup = output.find(g => g.department === 'Engineering');
@@ -984,7 +1006,7 @@ describe('CommutativeAggregateStep', () => {
                 expect(engineeringGroup?.totalSalary).toBe(220000); // 100000 + 120000
                 expect(salesGroup?.totalSalary).toBe(80000);
 
-                pipeline.remove('emp1');
+                pipeline.remove('emp1', emp1);
 
                 output = getOutput();
                 engineeringGroup = output.find(g => g.department === 'Engineering');
@@ -1079,14 +1101,16 @@ describe('CommutativeAggregateStep', () => {
                         )
                 );
 
-                pipeline.add('item1', { category: 'A', value: 100 });
-                pipeline.add('item2', { category: 'A', value: -30 });
+                const item1 = { category: 'A', value: 100 };
+                const item2 = { category: 'A', value: -30 };
+                pipeline.add('item1', item1);
+                pipeline.add('item2', item2);
 
                 let output = getOutput();
                 let group = output.find(g => g.category === 'A');
                 expect(group?.total).toBe(70);
 
-                pipeline.remove('item2');
+                pipeline.remove('item2', item2);
                 output = getOutput();
                 group = output.find(g => g.category === 'A');
                 expect(group?.total).toBe(100);
@@ -1104,13 +1128,14 @@ describe('CommutativeAggregateStep', () => {
                         )
                 );
 
-                pipeline.add('item1', { category: 'A', value: 42 });
+                const item1 = { category: 'A', value: 42 };
+                pipeline.add('item1', item1);
 
                 let output = getOutput();
                 let group = output.find(g => g.category === 'A');
                 expect(group?.total).toBe(42);
 
-                pipeline.remove('item1');
+                pipeline.remove('item1', item1);
                 output = getOutput();
                 expect(output.length).toBe(0);
             });
@@ -1147,7 +1172,7 @@ describe('CommutativeAggregateStep', () => {
                 expect(groupB?.total).toBe(30);
                 expect(groupB?.items).toBeUndefined();
 
-                pipeline.remove('item1');
+                pipeline.remove('item1', { category: 'A', value: 10 });
                 output = getOutput() as Array<{ category: string; total: number; items?: unknown }>;
                 const groupAAfter = output.find(g => g.category === 'A');
                 expect(groupAAfter?.total).toBe(20);
@@ -1197,7 +1222,7 @@ describe('CommutativeAggregateStep', () => {
                 let group = output.find(g => g.category === 'A');
                 expect(group?.count).toBe(3);
 
-                pipeline.remove('item2');
+                pipeline.remove('item2', { category: 'A', name: 'Second' });
                 output = getOutput();
                 group = output.find(g => g.category === 'A');
                 expect(group?.count).toBe(2);

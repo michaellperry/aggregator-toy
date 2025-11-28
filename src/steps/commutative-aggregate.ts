@@ -71,8 +71,8 @@ export class CommutativeAggregateStep<
     /** Maps parent path hash to current aggregate value */
     private aggregateValues: Map<string, TAggregate> = new Map();
     
-    /** Maps item path hash to item data for removal lookup */
-    private itemStore: Map<string, ImmutableProps> = new Map();
+    /** Maps parent path hash to count of items (for cleanup tracking) */
+    private itemCounts: Map<string, number> = new Map();
     
     /** Handlers for modified events at various levels */
     private modifiedHandlers: Array<{
@@ -91,8 +91,8 @@ export class CommutativeAggregateStep<
             this.handleItemAdded(path, key, immutableProps);
         });
         
-        this.input.onRemoved(this.arrayPath, (path, key) => {
-            this.handleItemRemoved(path, key);
+        this.input.onRemoved(this.arrayPath, (path, key, immutableProps) => {
+            this.handleItemRemoved(path, key, immutableProps);
         });
     }
     
@@ -141,15 +141,13 @@ export class CommutativeAggregateStep<
     private handleItemAdded(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
         // runtimePath contains the hash keys leading to this item
         // For arrayPath ['cities', 'venues'], runtimePath might be ['hash_TX', 'hash_Dallas']
-        // The full item path would be runtimePath + [itemKey]
         
         const parentPath = runtimePath;
         const parentHash = computePathHash(parentPath);
-        const itemPath = [...runtimePath, itemKey];
-        const itemHash = computePathHash(itemPath);
         
-        // Store item for later removal
-        this.itemStore.set(itemHash, item);
+        // Track item count for cleanup
+        const currentCount = this.itemCounts.get(parentHash) ?? 0;
+        this.itemCounts.set(parentHash, currentCount + 1);
         
         // Compute new aggregate
         const currentAggregate = this.aggregateValues.get(parentHash);
@@ -180,20 +178,9 @@ export class CommutativeAggregateStep<
     /**
      * Handle when an item is removed from the target array
      */
-    private handleItemRemoved(runtimePath: string[], itemKey: string): void {
+    private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
         const parentPath = runtimePath;
         const parentHash = computePathHash(parentPath);
-        const itemPath = [...runtimePath, itemKey];
-        const itemHash = computePathHash(itemPath);
-        
-        // Lookup stored item data
-        const item = this.itemStore.get(itemHash);
-        if (!item) {
-            throw new Error(`Item ${itemKey} not found in item store`);
-        }
-        
-        // Remove from tracking
-        this.itemStore.delete(itemHash);
         
         // Get current aggregate
         const currentAggregate = this.aggregateValues.get(parentHash);
@@ -204,20 +191,15 @@ export class CommutativeAggregateStep<
         // Compute new aggregate
         const newAggregate = this.config.subtract(currentAggregate, item);
         
-        // Check if there are remaining items for this parent
-        // We do this by checking if any items in itemStore have the same parent hash prefix
-        let hasRemainingItems = false;
-        const storedItemHashes = Array.from(this.itemStore.keys());
-        for (let i = 0; i < storedItemHashes.length; i++) {
-            if (storedItemHashes[i].startsWith(parentHash + '::')) {
-                hasRemainingItems = true;
-                break;
-            }
-        }
+        // Update item count and clean up if no items remain
+        const currentCount = this.itemCounts.get(parentHash) ?? 0;
+        const newCount = currentCount - 1;
         
-        if (hasRemainingItems) {
+        if (newCount > 0) {
+            this.itemCounts.set(parentHash, newCount);
             this.aggregateValues.set(parentHash, newAggregate);
         } else {
+            this.itemCounts.delete(parentHash);
             this.aggregateValues.delete(parentHash);
         }
         

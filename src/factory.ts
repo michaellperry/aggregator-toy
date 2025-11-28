@@ -15,8 +15,8 @@ class InputPipeline<T> implements Pipeline<T>, Step {
         this.addedHandlers.forEach(handler => handler([], key, immutableProps as ImmutableProps));
     }
 
-    remove(key: string): void {
-        this.removedHandlers.forEach(handler => handler([], key));
+    remove(key: string, immutableProps: T): void {
+        this.removedHandlers.forEach(handler => handler([], key, immutableProps as ImmutableProps));
     }
 
     onAdded(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
@@ -25,7 +25,7 @@ class InputPipeline<T> implements Pipeline<T>, Step {
         }
     }
 
-    onRemoved(path: string[], handler: (path: string[], key: string) => void): void {
+    onRemoved(path: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
         if (path.length === 0) {
             this.removedHandlers.push(handler);
         }

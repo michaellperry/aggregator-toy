@@ -483,7 +483,7 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
                 setState(state => addToKeyedArray(state, pathName, path, key, immutableProps) as KeyedArray<T>);
             });
             
-            this.lastStep.onRemoved(pathName, (path, key) => {
+            this.lastStep.onRemoved(pathName, (path, key, immutableProps) => {
                 setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
             });
             

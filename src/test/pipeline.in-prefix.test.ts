@@ -76,12 +76,14 @@ describe('pipeline in() path prefix', () => {
                     .in('cities').groupBy(['city'], 'venues')
             );
 
-            pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
-            pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
+            const venue1 = { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 };
+            const venue2 = { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 };
+            pipeline.add("venue1", venue1);
+            pipeline.add("venue2", venue2);
             
             expect(getOutput()[0].cities[0].venues).toHaveLength(2);
             
-            pipeline.remove("venue2");
+            pipeline.remove("venue2", venue2);
             
             const output = getOutput();
             expect(output[0].cities[0].venues).toHaveLength(1);
@@ -95,13 +97,15 @@ describe('pipeline in() path prefix', () => {
                     .in('cities').groupBy(['city'], 'venues')
             );
 
-            pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
-            pipeline.add("venue2", { state: 'TX', city: 'Houston', venue: 'Center', capacity: 30000 });
+            const venue1 = { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 };
+            const venue2 = { state: 'TX', city: 'Houston', venue: 'Center', capacity: 30000 };
+            pipeline.add("venue1", venue1);
+            pipeline.add("venue2", venue2);
             
             expect(getOutput()[0].cities).toHaveLength(2);
             
             // Remove all venues from Dallas
-            pipeline.remove("venue1");
+            pipeline.remove("venue1", venue1);
             
             const output = getOutput();
             // Dallas city group should be removed, Houston should remain
@@ -284,15 +288,17 @@ describe('pipeline in() path prefix', () => {
                     )
             );
 
-            pipeline.add("venue1", { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 });
-            pipeline.add("venue2", { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 });
+            const venue1 = { state: 'TX', city: 'Dallas', venue: 'Stadium', capacity: 50000 };
+            const venue2 = { state: 'TX', city: 'Dallas', venue: 'Arena', capacity: 20000 };
+            pipeline.add("venue1", venue1);
+            pipeline.add("venue2", venue2);
 
             let output = getOutput() as Array<{ state: string; cities: Array<{ city: string; totalCapacity: number }> }>;
             let dallasCity = output[0].cities.find(c => c.city === 'Dallas');
             expect(dallasCity?.totalCapacity).toBe(70000);
 
             // Remove one venue
-            pipeline.remove("venue1");
+            pipeline.remove("venue1", venue1);
 
             output = getOutput() as Array<{ state: string; cities: Array<{ city: string; totalCapacity: number }> }>;
             dallasCity = output[0].cities.find(c => c.city === 'Dallas');

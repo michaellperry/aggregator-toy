@@ -23,9 +23,6 @@ export class MinMaxAggregateStep<
     /** Maps parent path hash to array of numeric values (excluding null/undefined) */
     private valueStore: Map<string, number[]> = new Map();
     
-    /** Maps item path hash to item data for removal lookup */
-    private itemStore: Map<string, ImmutableProps> = new Map();
-    
     /** Handlers for modified events at various levels */
     private modifiedHandlers: Array<{
         pathNames: string[];
@@ -44,8 +41,8 @@ export class MinMaxAggregateStep<
             this.handleItemAdded(path, key, immutableProps);
         });
         
-        this.input.onRemoved(this.arrayPath, (path, key) => {
-            this.handleItemRemoved(path, key);
+        this.input.onRemoved(this.arrayPath, (path, key, immutableProps) => {
+            this.handleItemRemoved(path, key, immutableProps);
         });
     }
     
@@ -94,11 +91,6 @@ export class MinMaxAggregateStep<
     private handleItemAdded(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
         const parentPath = runtimePath;
         const parentHash = computePathHash(parentPath);
-        const itemPath = [...runtimePath, itemKey];
-        const itemHash = computePathHash(itemPath);
-        
-        // Store item for later removal
-        this.itemStore.set(itemHash, item);
         
         // Extract numeric value (ignore null/undefined)
         const value = item[this.numericProperty];
@@ -135,20 +127,9 @@ export class MinMaxAggregateStep<
     /**
      * Handle when an item is removed from the target array
      */
-    private handleItemRemoved(runtimePath: string[], itemKey: string): void {
+    private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
         const parentPath = runtimePath;
         const parentHash = computePathHash(parentPath);
-        const itemPath = [...runtimePath, itemKey];
-        const itemHash = computePathHash(itemPath);
-        
-        // Lookup stored item data
-        const item = this.itemStore.get(itemHash);
-        if (!item) {
-            throw new Error(`Item ${itemKey} not found in item store`);
-        }
-        
-        // Remove from tracking
-        this.itemStore.delete(itemHash);
         
         // Remove value from store if it was numeric
         const value = item[this.numericProperty];
