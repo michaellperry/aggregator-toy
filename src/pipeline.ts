@@ -16,20 +16,20 @@ export type ImmutableProps = {
     [key: string]: any;
 };
 
-export type AddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
+export type AddedHandler = (keyPath: string[], key: string, immutableProps: ImmutableProps) => void;
 
-export type RemovedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
+export type RemovedHandler = (keyPath: string[], key: string, immutableProps: ImmutableProps) => void;
 
-export type ModifiedHandler = (path: string[], key: string, name: string, value: any) => void;
+export type ModifiedHandler = (keyPath: string[], key: string, name: string, value: any) => void;
 
-export function getPathNamesFromDescriptor(descriptor: TypeDescriptor): string[][] {
+export function getPathSegmentsFromDescriptor(descriptor: TypeDescriptor): string[][] {
     // Include the path to the root of the descriptor
     const paths: string[][] = [[]];
     // Recursively get paths from nested type descriptors
     for (const array of descriptor.arrays) {
-        const allChildPaths = getPathNamesFromDescriptor(array.type);
-        for (const childPath of allChildPaths) {
-            paths.push([array.name, ...childPath]);
+        const allChildSegments = getPathSegmentsFromDescriptor(array.type);
+        for (const childSegments of allChildSegments) {
+            paths.push([array.name, ...childSegments]);
         }
     }
     return paths;
@@ -37,8 +37,8 @@ export function getPathNamesFromDescriptor(descriptor: TypeDescriptor): string[]
 
 export interface Step {
     getTypeDescriptor(): TypeDescriptor;
-    onAdded(pathNames: string[], handler: AddedHandler): void;
-    onRemoved(pathNames: string[], handler: RemovedHandler): void;
-    onModified(pathNames: string[], handler: ModifiedHandler): void;
+    onAdded(pathSegments: string[], handler: AddedHandler): void;
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void;
+    onModified(pathSegments: string[], handler: ModifiedHandler): void;
 }
 

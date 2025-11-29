@@ -67,7 +67,7 @@ flowchart LR
     end
     
     I -->|path: empty| GB1
-    G1 -->|path: empty with keyProps only| GB2
+    G1 -->|keyPath: empty with groupingValues only| GB2
     I1 -->|path: towns| GB2
     G2 -->|path: empty| Builder
     I2 -->|path: cities| Builder
@@ -77,49 +77,35 @@ flowchart LR
 
 The [`GroupByStep`](../src/steps/group-by.ts) processes items as follows:
 
-1. **Receives input** from its upstream step via `onAdded(path, handler)`
-2. **Creates groups** by extracting key properties and computing a hash
-3. **Emits group events** to path `[]` with ONLY key properties
-4. **Emits item events** to path `[arrayName]` with non-key properties
+1. **Receives input** from its upstream step via `onAdded(keyPath, handler)`
+2. **Creates groups** by extracting grouping properties and computing a group key
+3. **Emits group events** to path segments `[]` with ONLY grouping values
+4. **Emits item events** to path segments `[arrayName]` with non-grouping properties
 
 ### Identified Failure Points
 
 #### Failure Point 1: Group Emission Only Contains Key Properties
 
-At [`group-by.ts:106`](../src/steps/group-by.ts:106):
+At [`group-by.ts:219`](../src/steps/group-by.ts:219):
 ```typescript
-// Emit the group (path [])
-const groupHandler = this.addedHandlers.get('');
-if (groupHandler) {
-    groupHandler([], groupKey, group.keyProps);  // ← Only keyProps!
-}
+// Emit the group (path segments [])
+this.groupAddedHandlers.forEach(handler => 
+    handler(parentKeyPath, groupKey, groupingValues)
+);
 ```
 
-When a group is created, only `keyProps` (`{ state, city }`) is emitted, NOT the complete object with nested arrays.
+When a group is created, only `groupingValues` (`{ state, city }`) is emitted, NOT the complete object with nested arrays.
 
 #### Failure Point 2: Nested Array Items Are Skipped
 
-At [`group-by.ts:55-64`](../src/steps/group-by.ts:55):
-```typescript
-const hasAllKeyProperties = this.keyProperties.every(prop => {
-    const propStr = String(prop);
-    return propStr in immutableProps && props[propStr] !== undefined;
-});
-if (!hasAllKeyProperties) {
-    if (inputPath.length > 0) {
-        return;  // ← Items from nested arrays are SKIPPED!
-    }
-}
-```
-
-Items from path `['towns']` don't have the `state` key property, so they're skipped by the second `groupBy`.
+Items from path segments `['towns']` don't have the `state` grouping property, so they're skipped by the second `groupBy` when it checks for grouping properties.
 
 #### Failure Point 3: Builder Only Captures Last Step
 
-At [`builder.ts:41-60`](../src/builder.ts:41):
+At [`builder.ts:509-525`](../src/builder.ts:509):
 ```typescript
-paths.forEach(path => {
-    this.lastStep.onAdded(path, (path, key, immutableProps) => {
+pathSegments.forEach(segmentPath => {
+    this.lastStep.onAdded(segmentPath, (keyPath, key, immutableProps) => {
         setState(state => { /* ... */ });
     });
 });
@@ -142,17 +128,17 @@ sequenceDiagram
     participant State
 
     User->>Input: add town1 state=TX city=Dallas town=Plano
-    Input->>GB1: path=[] key=town1 value={state,city,town,pop}
+    Input->>GB1: keyPath=[] itemKey=town1 value={state,city,town,pop}
     
     Note over GB1: Create group hash TX+Dallas
-    GB1->>GB2: path=[] key=hash_TXDallas value={state,city}
+    GB1->>GB2: keyPath=[] itemKey=hash_TXDallas value={state,city}
     Note over GB2: Create group hash TX
-    GB2->>State: path=[] key=hash_TX value={state}
+    GB2->>State: keyPath=[] itemKey=hash_TX value={state}
     
-    GB1->>GB2: path=[towns] key=town1 value={town,pop}
-    Note over GB2: SKIPPED - no state property!
+    GB1->>GB2: pathSegments=[towns] keyPath=[hash_TXDallas] itemKey=town1 value={town,pop}
+    Note over GB2: SKIPPED - no state grouping property!
     
-    GB2->>State: path=[cities] key=hash_TXDallas value={city}
+    GB2->>State: pathSegments=[cities] keyPath=[hash_TX] itemKey=hash_TXDallas value={city}
     Note over State: city has NO towns array!
 ```
 
@@ -208,7 +194,7 @@ flowchart TB
             RG[Receive Group from path empty]
             RI[Receive Item from path arrayName]
             
-            RG --> |1. Extract keyProps| CG[Create/Update Output Group]
+            RG --> |1. Extract groupingValues| CG[Create/Update Output Group]
             RG --> |2. Extract nonKeyProps + nested arrays| EI[Emit to Output Array]
             
             RI --> |1. Extract parent from path| BUF[Buffer Item by Parent Group]
@@ -227,7 +213,8 @@ flowchart TB
 class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> {
     // Existing state
     private groups: Map<string, GroupData>;
-    private itemToGroup: Map<string, GroupInfo>;
+    private itemKeyToGroupKey: Map<string, string>;
+    private groupKeyToItemKeys: Map<string, Set<string>>;
     
     // NEW: Track nested array names from input TypeDescriptor
     private inputArrayNames: string[] = [];
@@ -238,7 +225,7 @@ class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> {
     
     // NEW: Track which input groups have been emitted to output array
     // Map: inputGroupKey -> outputKey
-    private groupToOutputKey: Map<string, string> = new Map();
+    private groupKeyToOutputKey: Map<string, string> = new Map();
 }
 ```
 
@@ -249,7 +236,7 @@ class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> {
 ```typescript
 constructor(
     private input: Step<T>,
-    private keyProperties: K[],
+    private groupingProperties: K[],
     private arrayName: ArrayName
 ) {
     // Analyze input TypeDescriptor to find nested arrays
@@ -268,21 +255,21 @@ constructor(
 When receiving a group from the input step:
 
 ```typescript
-// Current: Only emits keyProps
-groupHandler([], groupKey, group.keyProps);
+// Current: Only emits groupingValues
+groupHandler([], groupKey, group.groupingValues);
 
-// Modified: Still emits only keyProps (groups don't have arrays)
+// Modified: Still emits only groupingValues (groups don't have arrays)
 // Arrays are attached to ITEMS, not groups
 ```
 
-When emitting to the output array path:
+When emitting to the output array path segments:
 
 ```typescript
-// Current: Only emits nonKeyProps
-itemHandler([this.arrayName], inputGroupKey, nonKeyProps);
+// Current: Only emits nonGroupingProps
+itemHandler([this.arrayName], inputGroupKey, nonGroupingProps);
 
 // Modified: Include nested arrays from buffer
-const completeValue = { ...nonKeyProps };
+const completeValue = { ...nonGroupingProps };
 for (const inputArrayName of this.inputArrayNames) {
     const buffer = this.nestedItemBuffers.get(inputArrayName);
     const nestedItems = buffer?.get(inputGroupKey) || [];
@@ -291,22 +278,22 @@ for (const inputArrayName of this.inputArrayNames) {
 itemHandler([this.arrayName], inputGroupKey, completeValue);
 
 // Track for re-emission
-this.groupToOutputKey.set(inputGroupKey, inputGroupKey);
+this.groupKeyToOutputKey.set(inputGroupKey, inputGroupKey);
 ```
 
 #### 3. Processing Items from Nested Array Paths
 
-When receiving items from path `['inputArrayName']`:
+When receiving items from path segments `['inputArrayName']`:
 
 ```typescript
-onAdded(inputPath, (path, itemKey, itemValue) => {
-    if (inputPath.length > 0 && this.inputArrayNames.includes(inputPath[0])) {
-        const inputArrayName = inputPath[0];
+onAdded(inputPathSegments, (keyPath, itemKey, itemValue) => {
+    if (inputPathSegments.length > 0 && this.inputArrayNames.includes(inputPathSegments[0])) {
+        const inputArrayName = inputPathSegments[0];
         
-        // Extract parent group key from the path
-        // Path format: [parentGroupKey, ...nestedPath]
-        // For items in nested arrays, path[0] is the parent group key
-        const parentGroupKey = path[0];
+        // Extract parent group key from the key path
+        // Key path format: [parentGroupKey, ...nestedKeyPath]
+        // For items in nested arrays, keyPath[0] is the parent group key
+        const parentGroupKey = keyPath[0];
         
         // Buffer the item
         const buffer = this.nestedItemBuffers.get(inputArrayName)!;
@@ -316,7 +303,7 @@ onAdded(inputPath, (path, itemKey, itemValue) => {
         buffer.get(parentGroupKey)!.push(itemValue);
         
         // Re-emit if parent was already emitted to output array
-        const outputKey = this.groupToOutputKey.get(parentGroupKey);
+        const outputKey = this.groupKeyToOutputKey.get(parentGroupKey);
         if (outputKey) {
             this.reEmitWithNestedArrays(parentGroupKey, outputKey);
         }
@@ -331,16 +318,17 @@ private reEmitWithNestedArrays(inputGroupKey: string, outputKey: string): void {
     const group = this.findGroupByInputKey(inputGroupKey);
     if (!group) return;
     
-    const completeValue = { ...group.nonKeyProps };
+    const completeValue = { ...group.nonGroupingProps };
     for (const inputArrayName of this.inputArrayNames) {
         const buffer = this.nestedItemBuffers.get(inputArrayName);
         completeValue[inputArrayName] = buffer?.get(inputGroupKey) || [];
     }
     
-    const itemHandler = this.addedHandlers.get(this.arrayName);
-    if (itemHandler) {
+    const itemHandler = this.itemAddedHandlers;
+    if (itemHandler.length > 0) {
         // Re-emit with same key → Builder will UPDATE existing item
-        itemHandler([this.arrayName], outputKey, completeValue);
+        const parentKeyPath = this.itemKeyToParentKeyPath.get(outputKey) || [];
+        itemHandler.forEach(handler => handler([...parentKeyPath, inputGroupKey], outputKey, completeValue));
     }
 }
 ```
@@ -358,23 +346,23 @@ sequenceDiagram
     participant State
 
     User->>Input: add town1 {state=TX, city=Dallas, town=Plano}
-    Input->>GB1: path=[] value={state,city,town,pop}
+    Input->>GB1: keyPath=[] value={state,city,town,pop}
     
     Note over GB1: Create group TX_Dallas<br/>Buffer empty for towns
     
-    GB1->>GB2: path=[] key=TX_Dallas value={state,city}
-    GB1->>GB2: path=[towns] key=town1 value={town,pop}
-    Note over GB2: Path indicates parent: TX_Dallas
+    GB1->>GB2: keyPath=[] itemKey=TX_Dallas value={state,city}
+    GB1->>GB2: pathSegments=[towns] keyPath=[TX_Dallas] itemKey=town1 value={town,pop}
+    Note over GB2: Key path indicates parent: TX_Dallas
     
     Note over GB2: Create group TX<br/>Buffer for cities
     Note over GB2: Receive city TX_Dallas with empty towns
     
-    GB2->>State: path=[] key=TX value={state}
-    GB2->>State: path=[cities] key=TX_Dallas value={city, towns=[]}
+    GB2->>State: keyPath=[] itemKey=TX value={state}
+    GB2->>State: pathSegments=[cities] keyPath=[TX] itemKey=TX_Dallas value={city, towns=[]}
     
-    Note over GB2: Receive town from path towns<br/>Extract parent TX_Dallas from path<br/>Buffer: TX_Dallas → town1<br/>Re-emit city with updated towns
+    Note over GB2: Receive town from pathSegments towns<br/>Extract parent TX_Dallas from keyPath<br/>Buffer: TX_Dallas → town1<br/>Re-emit city with updated towns
     
-    GB2->>State: path=[cities] key=TX_Dallas value={city, towns=[town1]}
+    GB2->>State: pathSegments=[cities] keyPath=[TX] itemKey=TX_Dallas value={city, towns=[town1]}
     
     Note over State: UPDATE existing city<br/>Now has towns array!
 ```
@@ -414,9 +402,9 @@ This propagation allows each `GroupByStep` to know its input contains nested arr
 | Component | Current | Modified |
 |-----------|---------|----------|
 | Constructor | Initialize groups map | + Analyze input TypeDescriptor for arrays |
-| State | groups, itemToGroup | + nestedItemBuffers, groupToOutputKey |
-| onAdded for groups | Skip if missing key props from nested path | Process nested items separately |
-| Emit to array | Only nonKeyProps | nonKeyProps + buffered nested arrays |
+| State | groups, itemKeyToGroupKey | + nestedItemBuffers, groupKeyToOutputKey |
+| onAdded for groups | Skip if missing grouping props from nested path | Process nested items separately |
+| Emit to array | Only nonGroupingProps | nonGroupingProps + buffered nested arrays |
 | Re-emission | N/A | Re-emit when nested items arrive |
 
 ### 2. Files to Modify

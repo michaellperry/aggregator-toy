@@ -278,16 +278,16 @@ With the API change implemented (see [`docs/removed-handler-immutable-props-desi
 class FilterStep<T> implements Step {
     // No state needed!
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        this.input.onAdded(pathNames, (path, key, immutableProps) => {
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
+        this.input.onAdded(pathSegments, (keyPath, key, immutableProps) => {
             if (this.predicate(immutableProps as T)) {
                 handler(path, key, immutableProps);
             }
         });
     }
     
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        this.input.onRemoved(pathNames, (path, key, immutableProps) => {
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+        this.input.onRemoved(pathSegments, (keyPath, key, immutableProps) => {
             // Re-evaluate predicate - result is deterministic for immutable data!
             if (this.predicate(immutableProps as T)) {
                 handler(path, key, immutableProps);
@@ -353,7 +353,7 @@ export class FilterStep<T> implements Step {
     constructor(
         private input: Step,
         private predicate: (item: T) => boolean,
-        private scopePath: string[]
+        private scopeSegments: string[]
     ) {}
     
     getTypeDescriptor(): TypeDescriptor {
@@ -361,20 +361,20 @@ export class FilterStep<T> implements Step {
         return this.input.getTypeDescriptor();
     }
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
         // Implementation details in section 5.3
     }
     
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
         // Implementation details in section 5.4
     }
     
-    onModified(pathNames: string[], handler: ModifiedHandler): void {
+    onModified(pathSegments: string[], handler: ModifiedHandler): void {
         // Implementation details in section 5.5
     }
     
-    private isAtScopePath(pathNames: string[]): boolean {
-        return pathsMatch(pathNames, this.scopePath);
+    private isAtScopeSegments(pathSegments: string[]): boolean {
+        return pathsMatch(pathSegments, this.scopeSegments);
     }
 }
 ```
@@ -391,20 +391,20 @@ This is possible because:
 ### 5.3 `onAdded` Handler Logic
 
 ```typescript
-onAdded(pathNames: string[], handler: AddedHandler): void {
-    if (this.isAtScopePath(pathNames)) {
+onAdded(pathSegments: string[], handler: AddedHandler): void {
+    if (this.isAtScopeSegments(pathSegments)) {
         // Register intercepting handler with input
-        this.input.onAdded(pathNames, (path, key, immutableProps) => {
+        this.input.onAdded(pathSegments, (keyPath, key, immutableProps) => {
             // Evaluate predicate
             if (this.predicate(immutableProps as T)) {
                 // Item passes filter - forward
-                handler(path, key, immutableProps);
+                handler(keyPath, key, immutableProps);
             }
             // Item fails filter - do not forward
         });
     } else {
-        // Not at scope path - pass through unchanged
-        this.input.onAdded(pathNames, handler);
+        // Not at scope segments - pass through unchanged
+        this.input.onAdded(pathSegments, handler);
     }
 }
 ```
@@ -412,20 +412,20 @@ onAdded(pathNames: string[], handler: AddedHandler): void {
 ### 5.4 `onRemoved` Handler Logic
 
 ```typescript
-onRemoved(pathNames: string[], handler: RemovedHandler): void {
-    if (this.isAtScopePath(pathNames)) {
+onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+    if (this.isAtScopeSegments(pathSegments)) {
         // Register intercepting handler with input
         // NOTE: Requires updated RemovedHandler signature with immutableProps
-        this.input.onRemoved(pathNames, (path, key, immutableProps) => {
+        this.input.onRemoved(pathSegments, (keyPath, key, immutableProps) => {
             // Re-evaluate predicate - same result as at add time due to immutability
             if (this.predicate(immutableProps as T)) {
-                handler(path, key, immutableProps);
+                handler(keyPath, key, immutableProps);
             }
             // Item was filtered out on add - ignore removal
         });
     } else {
-        // Not at scope path - pass through unchanged
-        this.input.onRemoved(pathNames, handler);
+        // Not at scope segments - pass through unchanged
+        this.input.onRemoved(pathSegments, handler);
     }
 }
 ```
@@ -433,19 +433,19 @@ onRemoved(pathNames: string[], handler: RemovedHandler): void {
 ### 5.5 `onModified` Handler Logic
 
 ```typescript
-onModified(pathNames: string[], handler: ModifiedHandler): void {
-    if (this.isAtScopePath(pathNames)) {
+onModified(pathSegments: string[], handler: ModifiedHandler): void {
+    if (this.isAtScopeSegments(pathSegments)) {
         // For modifications, we need a way to check the predicate
         // Option 1: Store items (adds state, defeats purpose)
         // Option 2: Accept that modifications inherently need context
         //
-        // Recommended: Pass through modifications at scope path
+        // Recommended: Pass through modifications at scope segments
         // The downstream steps already have the item if it was added
         // If the item was filtered out, no handlers exist downstream
-        this.input.onModified(pathNames, handler);
+        this.input.onModified(pathSegments, handler);
     } else {
-        // Not at scope path - pass through unchanged
-        this.input.onModified(pathNames, handler);
+        // Not at scope segments - pass through unchanged
+        this.input.onModified(pathSegments, handler);
     }
 }
 ```
@@ -553,9 +553,9 @@ class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
         const newStep = new FilterStep<NavigateToPath<T, Path>>(
             this.lastStep,
             predicate as (item: unknown) => boolean,
-            this.scopePath as string[]
+            this.scopeSegments as string[]
         );
-        return new PipelineBuilder(this.input, newStep, this.scopePath) as any;
+        return new PipelineBuilder(this.input, newStep, this.scopeSegments) as any;
     }
 }
 ```

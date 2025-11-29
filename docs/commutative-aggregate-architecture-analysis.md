@@ -14,9 +14,9 @@ The pipeline uses an **event-driven, observer pattern** architecture with three 
 
 ```typescript
 // Core handler types
-type AddedHandler = (path: string[], key: string, immutableProps: ImmutableProps) => void;
-type RemovedHandler = (path: string[], key: string) => void;
-type ModifiedHandler = (path: string[], key: string, name: string, value: any) => void;
+type AddedHandler = (keyPath: string[], key: string, immutableProps: ImmutableProps) => void;
+type RemovedHandler = (keyPath: string[], key: string) => void;
+type ModifiedHandler = (keyPath: string[], key: string, name: string, value: any) => void;
 ```
 
 ### The Step Interface
@@ -26,9 +26,9 @@ Every operation in the pipeline implements the [`Step`](../src/pipeline.ts:38) i
 ```typescript
 interface Step {
     getTypeDescriptor(): TypeDescriptor;
-    onAdded(pathNames: string[], handler: AddedHandler): void;
-    onRemoved(pathNames: string[], handler: RemovedHandler): void;
-    onModified(pathNames: string[], handler: ModifiedHandler): void;
+    onAdded(pathSegments: string[], handler: AddedHandler): void;
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void;
+    onModified(pathSegments: string[], handler: ModifiedHandler): void;
 }
 ```
 
@@ -68,30 +68,30 @@ interface ArrayDescriptor {
 
 ## 2. Path System - Navigating the Tree
 
-### Path Names vs Runtime Paths
+### Path Segments vs Runtime Key Paths
 
-1. **Path Names (Static):** Array of property names describing a level in the tree structure
+1. **Path Segments (Static):** Array of array name segments describing a level in the tree structure
    - Example: `['cities', 'towns']` - the towns array inside cities
 
-2. **Runtime Paths:** Array of hash keys identifying a specific location at runtime
+2. **Runtime Key Paths:** Array of runtime keys identifying a specific location at runtime
    - Example: `['hash_TX', 'hash_Dallas']` - a specific city inside a specific state group
 
 ### Handler Registration
 
-Steps use `pathNames` to determine which handlers to register:
+Steps use `pathSegments` to determine which handlers to register:
 
 ```typescript
 // In GroupByStep.onAdded()
-if (pathNames.length === 0) {
+if (pathSegments.length === 0) {
     // Handler is at the group level (root of this step's output)
     this.groupAddedHandlers.push(handler);
-} else if (pathNames.length === 1 && pathNames[0] === this.arrayName) {
+} else if (pathSegments.length === 1 && pathSegments[0] === this.arrayName) {
     // Handler is at the item level (inside the array)
     this.itemAddedHandlers.push(handler);
-} else if (pathNames.length > 1 && pathNames[0] === this.arrayName) {
+} else if (pathSegments.length > 1 && pathSegments[0] === this.arrayName) {
     // Handler is below this array - intercept and pass to input
-    const shiftedPath = pathNames.slice(1);
-    this.input.onAdded(shiftedPath, ...);
+    const shiftedSegments = pathSegments.slice(1);
+    this.input.onAdded(shiftedSegments, ...);
 }
 ```
 
@@ -112,22 +112,22 @@ class DefinePropertyStep<T, K extends string, U> implements Step {
         return this.input.getTypeDescriptor();  // Pass through unchanged
     }
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        this.input.onAdded(pathNames, (path, key, immutableProps) => {
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
+        this.input.onAdded(pathSegments, (keyPath, key, immutableProps) => {
             // Transform by adding computed property
-            handler(path, key, { 
+            handler(keyPath, key, { 
                 ...immutableProps, 
                 [this.propertyName]: this.compute(immutableProps as T) 
             });
         });
     }
     
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        this.input.onRemoved(pathNames, handler);  // Pass through unchanged
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+        this.input.onRemoved(pathSegments, handler);  // Pass through unchanged
     }
     
-    onModified(pathNames: string[], handler: ModifiedHandler): void {
-        this.input.onModified(pathNames, handler);  // Pass through unchanged
+    onModified(pathSegments: string[], handler: ModifiedHandler): void {
+        this.input.onModified(pathSegments, handler);  // Pass through unchanged
     }
 }
 ```
@@ -143,10 +143,10 @@ class DefinePropertyStep<T, K extends string, U> implements Step {
 [`DropPropertyStep`](../src/steps/drop-property.ts) removes a property from the output:
 
 ```typescript
-onAdded(pathNames: string[], handler: AddedHandler): void {
-    this.input.onAdded(pathNames, (path, key, immutableProps) => {
+onAdded(pathSegments: string[], handler: AddedHandler): void {
+    this.input.onAdded(pathSegments, (keyPath, key, immutableProps) => {
         const { [this.propertyName]: _, ...rest } = immutableProps;
-        handler(path, key, rest as Omit<T, K>);
+        handler(keyPath, key, rest as Omit<T, K>);
     });
 }
 ```
@@ -158,8 +158,8 @@ onAdded(pathNames: string[], handler: AddedHandler): void {
 ```typescript
 class GroupByStep<T extends {}, K extends keyof T, ArrayName extends string> {
     // Maps for tracking group membership
-    keyToGroupHash: Map<string, string> = new Map();
-    groupToKeys: Map<string, Set<string>> = new Map();
+    itemKeyToGroupKey: Map<string, string> = new Map();
+    groupKeyToItemKeys: Map<string, Set<string>> = new Map();
     
     // Separate handler arrays for different path levels
     groupAddedHandlers: AddedHandler[] = [];
@@ -190,7 +190,7 @@ class PipelineBuilder<TStart, T extends {}> {
     defineProperty<K extends string, U>(propertyName: K, compute: (item: T) => U)
         : PipelineBuilder<TStart, T & Record<K, U>> { ... }
     
-    groupBy<K extends keyof T, ArrayName extends string>(keyProperties: K[], arrayName: ArrayName)
+    groupBy<K extends keyof T, ArrayName extends string>(groupingProperties: K[], arrayName: ArrayName)
         : PipelineBuilder<TStart, Expand<{...}>> { ... }
     
     build(setState: (transform: Transform<KeyedArray<T>>) => void, 
@@ -223,7 +223,7 @@ From [`pipeline.ts:23`](../src/pipeline.ts:23):
 type ModifiedHandler = (path: string[], key: string, name: string, value: any) => void;
 ```
 
-- `path`: Runtime path to the modified item
+- `keyPath`: Runtime key path to the modified item
 - `key`: The item's unique key
 - `name`: The property name being modified
 - `value`: The new value
@@ -231,10 +231,10 @@ type ModifiedHandler = (path: string[], key: string, name: string, value: any) =
 ### How Steps Handle onModified
 
 1. **DefinePropertyStep/DropPropertyStep:** Pass through to input unchanged
-2. **GroupByStep:** Routes based on path, prepending group hash to runtime path
+2. **GroupByStep:** Routes based on path segments, prepending group key to runtime key path
 3. **InputPipeline:** No-op (input is immutable)
 
-**Key Insight:** `onModified` is currently underutilized - it exists for future computed/aggregate properties that need to signal changes.
+**Key Insight:** `onModified` is used for computed/aggregate properties that need to signal changes when aggregate values update.
 
 ---
 
@@ -302,8 +302,8 @@ Or with a stateful aggregator pattern for efficiency:
 The step should follow the "stateful transform" pattern like GroupByStep:
 
 ```typescript
-class CommutativeAggregateStep<T, ArrayPath, PropName, R> implements Step {
-    // Track current aggregate values by parent key
+class CommutativeAggregateStep<T, SegmentPath, PropName, R> implements Step {
+    // Track current aggregate values by parent key hash
     private aggregateValues: Map<string, R> = new Map();
     
     // Track items contributing to each aggregate
@@ -311,7 +311,7 @@ class CommutativeAggregateStep<T, ArrayPath, PropName, R> implements Step {
     
     constructor(
         private input: Step,
-        private arrayPath: string[],    // Path to the array to aggregate
+        private segmentPath: SegmentPath,    // Path segments to the array to aggregate
         private propertyName: PropName,
         private aggregator: {
             zero: () => R,
@@ -319,9 +319,9 @@ class CommutativeAggregateStep<T, ArrayPath, PropName, R> implements Step {
             remove: (acc: R, item: any) => R
         }
     ) {
-        // Register for items at the array path
-        this.input.onAdded(arrayPath, this.handleItemAdded.bind(this));
-        this.input.onRemoved(arrayPath, this.handleItemRemoved.bind(this));
+        // Register for items at the segment path
+        this.input.onAdded(segmentPath, this.handleItemAdded.bind(this));
+        this.input.onRemoved(segmentPath, this.handleItemRemoved.bind(this));
     }
 }
 ```
@@ -331,8 +331,8 @@ class CommutativeAggregateStep<T, ArrayPath, PropName, R> implements Step {
 ```mermaid
 flowchart TD
     subgraph Input Events
-        IA[Item Added at arrayPath]
-        IR[Item Removed at arrayPath]
+        IA[Item Added at segmentPath]
+        IR[Item Removed at segmentPath]
         GA[Group Added at root]
     end
     
@@ -364,7 +364,7 @@ The builder method should add the aggregate property to the parent level type:
 ```typescript
 // In PipelineBuilder
 commutativeAggregate<ArrayPath extends string, PropName extends string, R>(
-    arrayPath: ArrayPath,
+    segmentPath: SegmentPath,
     propertyName: PropName,
     aggregator: Aggregator<ArrayItemType<T, ArrayPath>, R>
 ): PipelineBuilder<TStart, AddAggregateProperty<T, ArrayPath, PropName, R>> {
@@ -381,16 +381,16 @@ Where `AddAggregateProperty` is a type utility that:
 1. **TypeDescriptor Unchanged:** Aggregates don't add new arrays, so TypeDescriptor passes through
 
 2. **onModified Emission:** When aggregate value changes, emit `onModified` event with:
-   - `path`: Runtime path to the parent (e.g., `['hash_TX']` for a state group)
-   - `key`: The parent's key (same as last element of path)
+   - `keyPath`: Runtime key path to the parent (e.g., `['hash_TX']` for a state group)
+   - `key`: The parent's key (same as last element of keyPath)
    - `name`: The aggregate property name (e.g., `'totalValue'`)
    - `value`: The new aggregate value
 
 3. **Initial Value:** When a new parent is created, initialize aggregate to `zero()`
 
-4. **Path Handling:** Must correctly identify the parent from the item's path:
-   - If arrayPath is `['items']` and item path is `['hash_A', 'item123']`
-   - Parent path is `['hash_A']` and parent key is `'hash_A'`
+4. **Key Path Handling:** Must correctly identify the parent from the item's key path:
+   - If segmentPath is `['items']` and item keyPath is `['hash_A', 'item123']`
+   - Parent key path is `['hash_A']` and parent key is `'hash_A'`
 
 5. **Handler Registration:** Pass through all handlers to input, but intercept `onAdded` at root level to inject initial aggregate value
 
@@ -460,9 +460,9 @@ flowchart TB
 | Aspect | Pattern | Example |
 |--------|---------|---------|
 | Step contract | Implement `Step` interface | All steps |
-| State tracking | Use `Map` for bidirectional lookups | `GroupByStep.keyToGroupHash` |
-| Handler registration | Check `pathNames` to determine level | `GroupByStep.onAdded()` |
-| Path interception | Shift path for nested levels | `pathNames.slice(1)` |
+| State tracking | Use `Map` for bidirectional lookups | `GroupByStep.itemKeyToGroupKey` |
+| Handler registration | Check `pathSegments` to determine level | `GroupByStep.onAdded()` |
+| Path interception | Shift segments for nested levels | `pathSegments.slice(1)` |
 | Type transformation | Return new `PipelineBuilder<TStart, NewType>` | `defineProperty()` |
 | onModified emission | Call handlers with `(path, key, name, value)` | New for aggregates |
 | Testing | Use `createTestPipeline()` helper | All test files |

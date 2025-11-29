@@ -1,27 +1,27 @@
 /**
- * Checks if two path arrays match exactly.
+ * Checks if two path segment arrays match exactly.
  * 
- * @param pathNames - The path to check
- * @param targetPath - The target path to compare against
- * @returns true if the paths match exactly
+ * @param pathSegments - The path segments to check
+ * @param targetSegments - The target path segments to compare against
+ * @returns true if the path segments match exactly
  */
-export function pathsMatch(pathNames: string[], targetPath: string[]): boolean {
-    if (pathNames.length !== targetPath.length) {
+export function pathsMatch(pathSegments: string[], targetSegments: string[]): boolean {
+    if (pathSegments.length !== targetSegments.length) {
         return false;
     }
-    return pathNames.every((name, i) => name === targetPath[i]);
+    return pathSegments.every((segment, i) => segment === targetSegments[i]);
 }
 
 /**
- * Checks if pathNames starts with the given prefix path.
+ * Checks if pathSegments starts with the given prefix path segments.
  * 
- * @param pathNames - The path to check
- * @param prefixPath - The prefix path to compare against
- * @returns true if pathNames starts with prefixPath
+ * @param pathSegments - The path segments to check
+ * @param prefixSegments - The prefix path segments to compare against
+ * @returns true if pathSegments starts with prefixSegments
  */
-export function pathStartsWith(pathNames: string[], prefixPath: string[]): boolean {
-    if (pathNames.length < prefixPath.length) {
+export function pathStartsWith(pathSegments: string[], prefixSegments: string[]): boolean {
+    if (pathSegments.length < prefixSegments.length) {
         return false;
     }
-    return prefixPath.every((name, i) => name === pathNames[i]);
+    return prefixSegments.every((segment, i) => segment === pathSegments[i]);
 }

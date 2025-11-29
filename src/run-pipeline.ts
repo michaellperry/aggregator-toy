@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { computeKeyHash } from './util/hash';
+import { computeGroupKey } from './util/hash';
 
 /**
  * Pipeline runner script that processes JSON input through a pipeline
@@ -63,7 +63,7 @@ async function main() {
         // Process each item through the pipeline
         inputData.forEach((item: any) => {
             // Generate a unique ID based on all properties of the item
-            const itemId = computeKeyHash(item, Object.keys(item));
+            const itemId = computeGroupKey(item, Object.keys(item));
             
             pipeline.add(itemId, item);
         });

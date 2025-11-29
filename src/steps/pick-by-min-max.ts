@@ -1,10 +1,10 @@
 import type { AddedHandler, ImmutableProps, ModifiedHandler, RemovedHandler, Step, TypeDescriptor } from '../pipeline';
 
 /**
- * Computes a hash key for a path (for map lookups).
+ * Computes a hash key for a key path (for map lookups).
  */
-function computePathHash(path: string[]): string {
-    return path.join('::');
+function computeKeyPathHash(keyPath: string[]): string {
+    return keyPath.join('::');
 }
 
 /**
@@ -49,35 +49,35 @@ export class PickByMinMaxStep<
     TPropertyName extends string
 > implements Step {
     
-    /** Maps item path hash to item data (needed for recalculation when picked item is removed) */
+    /** Maps item key path hash to item data (needed for recalculation when picked item is removed) */
     private itemStore: Map<string, ImmutableProps> = new Map();
     
-    /** Maps parent path hash to current min/max item */
+    /** Maps parent key path hash to current min/max item */
     private pickedItemStore: Map<string, ImmutableProps> = new Map();
     
-    /** Maps parent path hash to comparison value of current picked item */
+    /** Maps parent key path hash to comparison value of current picked item */
     private comparisonValueStore: Map<string, number | string> = new Map();
     
     /** Handlers for modified events at various levels */
     private modifiedHandlers: Array<{
-        pathNames: string[];
+        pathSegments: string[];
         handler: ModifiedHandler;
     }> = [];
     
     constructor(
         private input: Step,
-        private arrayPath: TPath,
+        private segmentPath: TPath,
         private propertyName: TPropertyName,
         private comparisonProperty: string,
         private compareFn: (value1: number | string, value2: number | string) => boolean
     ) {
         // Register with input step to receive item add/remove events at the target array level
-        this.input.onAdded(this.arrayPath, (path, key, immutableProps) => {
-            this.handleItemAdded(path, key, immutableProps);
+        this.input.onAdded(this.segmentPath, (keyPath, itemKey, immutableProps) => {
+            this.handleItemAdded(keyPath, itemKey, immutableProps);
         });
         
-        this.input.onRemoved(this.arrayPath, (path, key, immutableProps) => {
-            this.handleItemRemoved(path, key, immutableProps);
+        this.input.onRemoved(this.segmentPath, (keyPath, itemKey, immutableProps) => {
+            this.handleItemRemoved(keyPath, itemKey, immutableProps);
         });
     }
     
@@ -85,60 +85,60 @@ export class PickByMinMaxStep<
         return this.input.getTypeDescriptor();
     }
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        this.input.onAdded(pathNames, handler);
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
+        this.input.onAdded(pathSegments, handler);
     }
     
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        this.input.onRemoved(pathNames, handler);
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+        this.input.onRemoved(pathSegments, handler);
     }
     
-    onModified(pathNames: string[], handler: ModifiedHandler): void {
-        if (this.isParentPath(pathNames)) {
+    onModified(pathSegments: string[], handler: ModifiedHandler): void {
+        if (this.isParentPath(pathSegments)) {
             // Handler wants modification events at parent level
             // This is the channel for receiving picked object
             this.modifiedHandlers.push({
-                pathNames,
+                pathSegments,
                 handler
             });
         }
         // Always pass through to input for other property modifications
-        this.input.onModified(pathNames, handler);
+        this.input.onModified(pathSegments, handler);
     }
     
     /**
-     * Checks if the given path represents the parent level (where picked object property lives)
+     * Checks if the given path segments represent the parent level (where picked object property lives)
      */
-    private isParentPath(pathNames: string[]): boolean {
-        // Parent path is arrayPath without the last element
-        const parentPath = this.arrayPath.slice(0, -1);
+    private isParentPath(pathSegments: string[]): boolean {
+        // Parent path segments are segmentPath without the last element
+        const parentSegments = this.segmentPath.slice(0, -1);
         
-        if (pathNames.length !== parentPath.length) {
+        if (pathSegments.length !== parentSegments.length) {
             return false;
         }
         
-        return pathNames.every((name, i) => name === parentPath[i]);
+        return pathSegments.every((segment, i) => segment === parentSegments[i]);
     }
     
     /**
      * Handle when an item is added to the target array
      */
-    private handleItemAdded(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
-        const parentPath = runtimePath;
-        const parentHash = computePathHash(parentPath);
-        const itemPath = [...runtimePath, itemKey];
-        const itemHash = computePathHash(itemPath);
+    private handleItemAdded(keyPath: string[], itemKey: string, item: ImmutableProps): void {
+        const parentKeyPath = keyPath;
+        const parentKeyHash = computeKeyPathHash(parentKeyPath);
+        const itemKeyPath = [...keyPath, itemKey];
+        const itemKeyHash = computeKeyPathHash(itemKeyPath);
         
         // Store item for later removal
-        this.itemStore.set(itemHash, item);
+        this.itemStore.set(itemKeyHash, item);
         
         // Extract comparison value (ignore null/undefined)
         const value = item[this.comparisonProperty];
         if (value === null || value === undefined) {
             // Ignore null/undefined values
             // If we don't have a picked item yet, emit undefined
-            if (!this.pickedItemStore.has(parentHash)) {
-                this.emitModification(parentPath, undefined);
+            if (!this.pickedItemStore.has(parentKeyHash)) {
+                this.emitModification(parentKeyPath, undefined);
             }
             return;
         }
@@ -147,7 +147,7 @@ export class PickByMinMaxStep<
         const comparisonValue: number | string = isNumeric(value) ? Number(value) : String(value);
         
         // Check if this is a new min/max based on comparison function
-        const currentPickedValue = this.comparisonValueStore.get(parentHash);
+        const currentPickedValue = this.comparisonValueStore.get(parentKeyHash);
         let shouldUpdate = false;
         
         if (currentPickedValue === undefined) {
@@ -159,46 +159,46 @@ export class PickByMinMaxStep<
         }
         
         if (shouldUpdate) {
-            this.pickedItemStore.set(parentHash, item);
-            this.comparisonValueStore.set(parentHash, comparisonValue);
-            this.emitModification(parentPath, item);
+            this.pickedItemStore.set(parentKeyHash, item);
+            this.comparisonValueStore.set(parentKeyHash, comparisonValue);
+            this.emitModification(parentKeyPath, item);
         }
     }
     
     /**
      * Handle when an item is removed from the target array
      */
-    private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
-        const parentPath = runtimePath;
-        const parentHash = computePathHash(parentPath);
-        const itemPath = [...runtimePath, itemKey];
-        const itemHash = computePathHash(itemPath);
+    private handleItemRemoved(keyPath: string[], itemKey: string, item: ImmutableProps): void {
+        const parentKeyPath = keyPath;
+        const parentKeyHash = computeKeyPathHash(parentKeyPath);
+        const itemKeyPath = [...keyPath, itemKey];
+        const itemKeyHash = computeKeyPathHash(itemKeyPath);
         
         // Remove from tracking (needed for recalculation)
-        this.itemStore.delete(itemHash);
+        this.itemStore.delete(itemKeyHash);
         
         // Check if the removed item was the current picked item
-        const currentPickedItem = this.pickedItemStore.get(parentHash);
+        const currentPickedItem = this.pickedItemStore.get(parentKeyHash);
         const isRemovedItemPicked = currentPickedItem && this.itemsEqual(item, currentPickedItem);
         
         if (isRemovedItemPicked) {
             // Need to recalculate picked item from remaining items
-            this.recalculatePickedItem(parentPath, parentHash);
+            this.recalculatePickedItem(parentKeyPath, parentKeyHash);
         }
     }
     
     /**
      * Recalculates the picked item (min or max) from all remaining items for a given parent.
      */
-    private recalculatePickedItem(parentPath: string[], parentHash: string): void {
+    private recalculatePickedItem(parentKeyPath: string[], parentKeyHash: string): void {
         // Find all items for this parent
-        // Item hash format: parentHash::itemKey
-        const parentPrefix = parentHash + '::';
+        // Item key hash format: parentKeyHash::itemKey
+        const parentPrefix = parentKeyHash + '::';
         const itemsForParent: Array<{ item: ImmutableProps; value: number | string }> = [];
         
-        for (const [itemHash, item] of this.itemStore.entries()) {
+        for (const [itemKeyHash, item] of this.itemStore.entries()) {
             // Check if this item belongs to this parent
-            if (itemHash.startsWith(parentPrefix)) {
+            if (itemKeyHash.startsWith(parentPrefix)) {
                 const value = item[this.comparisonProperty];
                 if (value !== null && value !== undefined) {
                     const comparisonValue: number | string = isNumeric(value) ? Number(value) : String(value);
@@ -209,9 +209,9 @@ export class PickByMinMaxStep<
         
         if (itemsForParent.length === 0) {
             // No remaining items with valid values
-            this.pickedItemStore.delete(parentHash);
-            this.comparisonValueStore.delete(parentHash);
-            this.emitModification(parentPath, undefined);
+            this.pickedItemStore.delete(parentKeyHash);
+            this.comparisonValueStore.delete(parentKeyHash);
+            this.emitModification(parentKeyPath, undefined);
         } else {
             // Find the picked item (min or max) - first encountered wins on ties
             let pickedItem = itemsForParent[0].item;
@@ -224,9 +224,9 @@ export class PickByMinMaxStep<
                 }
             }
             
-            this.pickedItemStore.set(parentHash, pickedItem);
-            this.comparisonValueStore.set(parentHash, pickedValue);
-            this.emitModification(parentPath, pickedItem);
+            this.pickedItemStore.set(parentKeyHash, pickedItem);
+            this.comparisonValueStore.set(parentKeyHash, pickedValue);
+            this.emitModification(parentKeyPath, pickedItem);
         }
     }
     
@@ -253,13 +253,13 @@ export class PickByMinMaxStep<
     /**
      * Emits a modification event for the picked object.
      */
-    private emitModification(parentPath: string[], pickedItem: ImmutableProps | undefined): void {
-        if (parentPath.length > 0) {
-            const parentKey = parentPath[parentPath.length - 1];
-            const pathToParent = parentPath.slice(0, -1);
+    private emitModification(parentKeyPath: string[], pickedItem: ImmutableProps | undefined): void {
+        if (parentKeyPath.length > 0) {
+            const parentKey = parentKeyPath[parentKeyPath.length - 1];
+            const keyPathToParent = parentKeyPath.slice(0, -1);
             
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler(pathToParent, parentKey, this.propertyName, pickedItem);
+                handler(keyPathToParent, parentKey, this.propertyName, pickedItem);
             });
         } else {
             // Parent is at root level

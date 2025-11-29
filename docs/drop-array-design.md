@@ -69,7 +69,7 @@ export class DropArrayStep<
     
     constructor(
         private input: Step,
-        private arrayPath: TPath
+        private segmentPath: TPath
     ) {
         // No event handlers to register - this step only filters
     }
@@ -86,22 +86,22 @@ interface Step {
     getTypeDescriptor(): TypeDescriptor;
     
     /**
-     * Registers an added handler if the path is NOT at or below the target array.
-     * Paths at or below the target array are silently ignored (suppressed).
+     * Registers an added handler if the path segments are NOT at or below the target array.
+     * Path segments at or below the target array are silently ignored (suppressed).
      */
-    onAdded(pathNames: string[], handler: AddedHandler): void;
+    onAdded(pathSegments: string[], handler: AddedHandler): void;
     
     /**
-     * Registers a removed handler if the path is NOT at or below the target array.
-     * Paths at or below the target array are silently ignored (suppressed).
+     * Registers a removed handler if the path segments are NOT at or below the target array.
+     * Path segments at or below the target array are silently ignored (suppressed).
      */
-    onRemoved(pathNames: string[], handler: RemovedHandler): void;
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void;
     
     /**
-     * Registers a modified handler if the path is NOT at or below the target array.
-     * Paths at or below the target array are silently ignored (suppressed).
+     * Registers a modified handler if the path segments are NOT at or below the target array.
+     * Path segments at or below the target array are silently ignored (suppressed).
      */
-    onModified(pathNames: string[], handler: ModifiedHandler): void;
+    onModified(pathSegments: string[], handler: ModifiedHandler): void;
 }
 ```
 
@@ -116,7 +116,7 @@ The `getTypeDescriptor()` method must recursively navigate the descriptor tree a
 ```typescript
 getTypeDescriptor(): TypeDescriptor {
     const inputDescriptor = this.input.getTypeDescriptor();
-    return this.transformDescriptor(inputDescriptor, [...this.arrayPath]);
+    return this.transformDescriptor(inputDescriptor, [...this.segmentPath]);
 }
 
 private transformDescriptor(
@@ -201,26 +201,26 @@ type DropArrayFromType<T, Path extends string[]> =
 
 ```typescript
 /**
- * Checks if a path is at or below the target array.
+ * Checks if path segments are at or below the target array.
  * 
- * @param pathNames - The path being checked (e.g., ['cities', 'venues'])
- * @returns true if the path starts with the arrayPath (at or below target)
+ * @param pathSegments - The path segments being checked (e.g., ['cities', 'venues'])
+ * @returns true if the path segments start with the segmentPath (at or below target)
  * 
  * @example
- * // arrayPath = ['cities', 'venues']
+ * // segmentPath = ['cities', 'venues']
  * isBelowTargetArray(['cities']) -> false         // above target
  * isBelowTargetArray(['cities', 'venues']) -> true  // at target
  * isBelowTargetArray(['cities', 'venues', 'staff']) -> true  // below target
  * isBelowTargetArray(['stores']) -> false         // unrelated
  */
-private isBelowTargetArray(pathNames: string[]): boolean {
-    // Path must be at least as long as arrayPath to be at or below
-    if (pathNames.length < this.arrayPath.length) {
+private isBelowTargetArray(pathSegments: string[]): boolean {
+    // Path segments must be at least as long as segmentPath to be at or below
+    if (pathSegments.length < this.segmentPath.length) {
         return false;
     }
     
-    // Check if pathNames starts with arrayPath
-    return this.arrayPath.every((name, i) => pathNames[i] === name);
+    // Check if pathSegments starts with segmentPath
+    return this.segmentPath.every((segment, i) => pathSegments[i] === segment);
 }
 ```
 
@@ -229,34 +229,34 @@ private isBelowTargetArray(pathNames: string[]): boolean {
 Each event handler method follows the same pattern:
 
 ```typescript
-onAdded(pathNames: string[], handler: AddedHandler): void {
-    if (this.isBelowTargetArray(pathNames)) {
-        // Path is at or below the dropped array
+onAdded(pathSegments: string[], handler: AddedHandler): void {
+    if (this.isBelowTargetArray(pathSegments)) {
+        // Path segments are at or below the dropped array
         // Silently suppress - do not register handler
         return;
     }
     
-    // Path is above or unrelated to the dropped array
+    // Path segments are above or unrelated to the dropped array
     // Pass through to input step
-    this.input.onAdded(pathNames, handler);
+    this.input.onAdded(pathSegments, handler);
 }
 
-onRemoved(pathNames: string[], handler: RemovedHandler): void {
-    if (this.isBelowTargetArray(pathNames)) {
+onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+    if (this.isBelowTargetArray(pathSegments)) {
         // Suppress events at or below the dropped array
         return;
     }
     
-    this.input.onRemoved(pathNames, handler);
+    this.input.onRemoved(pathSegments, handler);
 }
 
-onModified(pathNames: string[], handler: ModifiedHandler): void {
-    if (this.isBelowTargetArray(pathNames)) {
+onModified(pathSegments: string[], handler: ModifiedHandler): void {
+    if (this.isBelowTargetArray(pathSegments)) {
         // Suppress events at or below the dropped array
         return;
     }
     
-    this.input.onModified(pathNames, handler);
+    this.input.onModified(pathSegments, handler);
 }
 ```
 
@@ -418,7 +418,7 @@ class PipelineBuilder<TStart, T extends {}> {
      * Removes an array from the output type.
      * Events at or below this array path will be suppressed.
      * 
-     * @param arrayPath - Path to the array to remove
+     * @param segmentPath - Path segments to the array to remove
      */
     dropArray<Path extends ValidArrayPath<T>>(
         arrayPath: Path

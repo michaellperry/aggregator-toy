@@ -267,7 +267,7 @@ interface ScopedBuilder<TStart, TRoot, TScoped extends {}, Path extends string[]
      * Applied within the current scope.
      */
     groupBy<K extends keyof TScoped, ArrayName extends string>(
-        keyProperties: K[],
+        groupingProperties: K[],
         arrayName: ArrayName
     ): PipelineBuilder<TStart, TransformAtPath<TRoot, Path, {
         [P in K]: TScoped[P]
@@ -358,19 +358,19 @@ There are two types of paths in this system:
 
 | Parameter | Type | Example | Purpose |
 |-----------|------|---------|---------|
-| `pathNames` | Static array names | `['cities', 'venues']` | Used for handler **registration** - identifies which array level |
-| `path` | Runtime hash keys | `['hash_TX', 'hash_Dallas']` | Used in handler **callbacks** - identifies which specific items |
+| `pathSegments` | Static array name segments | `['cities', 'venues']` | Used for handler **registration** - identifies which array level |
+| `keyPath` | Runtime key path | `['hash_TX', 'hash_Dallas']` | Used in handler **callbacks** - identifies which specific items |
 
-The [`addToKeyedArray`](../src/builder.ts:219) function shows why both are essential:
+The [`addToKeyedArray`](../src/builder.ts:531) function shows why both are essential:
 
 ```typescript
-function addToKeyedArray(state, pathName, path, key, immutableProps) {
-    if (pathName.length === 0) {
+function addToKeyedArray(state, segmentPath, keyPath, key, immutableProps) {
+    if (segmentPath.length === 0) {
         return [...state, { key, value: immutableProps }];
     }
     else {
-        const parentKey = path[0];  // ← Uses runtime path to find parent!
-        const arrayName = pathName[0];
+        const parentKey = keyPath[0];  // ← Uses runtime key path to find parent!
+        const segment = segmentPath[0];
         const existingItemIndex = state.findIndex(item => item.key === parentKey);
         // ...recursively update at the correct location
     }
@@ -416,39 +416,39 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
     
     constructor(
         private input: Step,
-        private scopePath: string[],  // NEW: where in the tree this operates
-        private keyProperties: K[],
+        private scopeSegments: string[],  // NEW: where in the tree this operates
+        private groupingProperties: K[],
         private arrayName: ArrayName
     ) {
-        // Register at the scope path level
-        this.input.onAdded(this.scopePath, (path, key, immutableProps) => {
-            this.handleAdded(path, key, immutableProps);
+        // Register at the scope segments level
+        this.input.onAdded(this.scopeSegments, (keyPath, itemKey, immutableProps) => {
+            this.handleAdded(keyPath, itemKey, immutableProps);
         });
-        this.input.onRemoved(this.scopePath, (path, key) => {
-            this.handleRemoved(path, key);
+        this.input.onRemoved(this.scopeSegments, (keyPath, itemKey) => {
+            this.handleRemoved(keyPath, itemKey);
         });
     }
     
-    private handleAdded(path: string[], key: string, immutableProps: ImmutableProps) {
-        // path contains the runtime context - store it for emissions
-        this.keyToParentPath.set(key, path);
+    private handleAdded(keyPath: string[], itemKey: string, immutableProps: ImmutableProps) {
+        // keyPath contains the runtime context - store it for emissions
+        this.itemKeyToParentKeyPath.set(itemKey, keyPath);
         
-        // ... extract key props, compute hash, create group if new ...
+        // ... extract grouping values, compute group key, create group if new ...
         
-        // Emit group at the parent path level
-        const isNewGroup = !this.groupToKeys.has(keyHash);
+        // Emit group at the parent key path level
+        const isNewGroup = !this.groupKeyToItemKeys.has(groupKey);
         if (isNewGroup) {
-            this.groupToKeys.set(keyHash, new Set<string>());
-            // Emit with FULL path context
+            this.groupKeyToItemKeys.set(groupKey, new Set<string>());
+            // Emit with FULL key path context
             this.groupAddedHandlers.forEach(handler =>
-                handler(path, keyHash, keyProps)
+                handler(keyPath, groupKey, groupingValues)
             );
         }
-        this.groupToKeys.get(keyHash)!.add(key);
+        this.groupKeyToItemKeys.get(groupKey)!.add(itemKey);
         
-        // Emit item at parent path + group hash
+        // Emit item at parent key path + group key
         this.itemAddedHandlers.forEach(handler =>
-            handler([...path, keyHash], key, nonKeyProps)
+            handler([...keyPath, groupKey], itemKey, nonGroupingProps)
         );
     }
     
@@ -461,26 +461,26 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
         return this.rebuildDescriptorWithTransform(inputDescriptor);
     }
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        if (this.isAtGroupLevel(pathNames)) {
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
+        if (this.isAtGroupLevel(pathSegments)) {
             // Handler is at the group level (relative to scope)
             this.groupAddedHandlers.push(handler);
-        } else if (this.isAtItemLevel(pathNames)) {
+        } else if (this.isAtItemLevel(pathSegments)) {
             // Handler is at the item level
             this.itemAddedHandlers.push(handler);
-        } else if (this.isBelowItemLevel(pathNames)) {
+        } else if (this.isBelowItemLevel(pathSegments)) {
             // Handler is below this array - intercept and prefix
-            const shiftedPath = this.shiftPathBelowArray(pathNames);
-            this.input.onAdded(this.scopePath.concat(shiftedPath), (notifiedPath, key, props) => {
-                // notifiedPath includes scope context - pass through with group prefix
-                const itemHash = this.getItemHash(notifiedPath);
-                const groupHash = this.keyToGroupHash.get(itemHash);
-                const modifiedPath = this.insertGroupHash(notifiedPath, groupHash);
-                handler(modifiedPath, key, props);
+            const shiftedSegments = this.shiftPathBelowArray(pathSegments);
+            this.input.onAdded(this.scopeSegments.concat(shiftedSegments), (notifiedKeyPath, itemKey, props) => {
+                // notifiedKeyPath includes scope context - pass through with group prefix
+                const itemKeyAtScope = this.getItemKey(notifiedKeyPath);
+                const groupKey = this.itemKeyToGroupKey.get(itemKeyAtScope);
+                const modifiedKeyPath = this.insertGroupKey(notifiedKeyPath, groupKey);
+                handler(modifiedKeyPath, itemKey, props);
             });
         } else {
             // Handler is above scope or unrelated - pass through
-            this.input.onAdded(pathNames, handler);
+            this.input.onAdded(pathSegments, handler);
         }
     }
     
@@ -494,7 +494,7 @@ export class GroupByStep<T extends {}, K extends keyof T, ArrayName extends stri
 
 ```typescript
 // Current signature
-dropArray<TPath extends string[]>(arrayPath: TPath)
+dropArray<TPath extends string[]>(segmentPath: TPath)
 
 // Normalized signature - used with in()
 dropArray(arrayName: string)
@@ -508,10 +508,10 @@ export class DropArrayStep<TInput, ArrayName extends string> implements Step {
     
     constructor(
         private input: Step,
-        private scopePath: string[],   // From in()
+        private scopeSegments: string[],   // From in()
         private arrayName: ArrayName    // Just the array name
     ) {
-        this.fullPath = [...scopePath, arrayName];
+        this.fullSegmentPath = [...scopeSegments, arrayName];
     }
     
     // Rest of implementation uses this.fullPath
@@ -528,18 +528,18 @@ class ScopedBuilder<TStart, TRoot, TScoped extends {}, Path extends string[]> {
     constructor(
         private input: Pipeline<TStart>,
         private lastStep: Step,
-        private scopePath: Path
+        private scopeSegments: Path
     ) {}
     
     groupBy<K extends keyof TScoped, ArrayName extends string>(
-        keyProperties: K[],
+        groupingProperties: K[],
         arrayName: ArrayName
     ): PipelineBuilder<TStart, TransformedType> {
-        // Pass scopePath to the step
+        // Pass scopeSegments to the step
         const newStep = new GroupByStep(
             this.lastStep,
-            this.scopePath,   // ← Scope context
-            keyProperties,
+            this.scopeSegments,   // ← Scope context
+            groupingProperties,
             arrayName
         );
         return new PipelineBuilder(this.input, newStep);
@@ -548,7 +548,7 @@ class ScopedBuilder<TStart, TRoot, TScoped extends {}, Path extends string[]> {
     dropArray(arrayName: string): PipelineBuilder<TStart, TransformedType> {
         const newStep = new DropArrayStep(
             this.lastStep,
-            this.scopePath,   // ← Scope context
+            this.scopeSegments,   // ← Scope context
             arrayName
         );
         return new PipelineBuilder(this.input, newStep);
@@ -562,7 +562,7 @@ class ScopedBuilder<TStart, TRoot, TScoped extends {}, Path extends string[]> {
     ): PipelineBuilder<TStart, TransformedType> {
         const newStep = new CommutativeAggregateStep(
             this.lastStep,
-            [...this.scopePath, arrayName],  // Full path = scope + name
+            [...this.scopeSegments, arrayName],  // Full segment path = scope + name
             propertyName,
             { add, subtract }
         );
@@ -579,26 +579,26 @@ class ScopedBuilder<TStart, TRoot, TScoped extends {}, Path extends string[]> {
 sequenceDiagram
     participant User
     participant Input as InputPipeline
-    participant GB1 as GroupByStep<br/>scopePath: []<br/>arrayName: cities
-    participant GB2 as GroupByStep<br/>scopePath: [cities]<br/>arrayName: venues
+    participant GB1 as GroupByStep<br/>scopeSegments: []<br/>arrayName: cities
+    participant GB2 as GroupByStep<br/>scopeSegments: [cities]<br/>arrayName: venues
     participant Builder
     
     Note over User,Builder: .groupBy[state], cities.in[cities].groupBy[city], venues
     
     User->>Input: add venue1 state=TX, city=Dallas, venue
-    Input->>GB1: pathNames=[] path=[] key=venue1
+    Input->>GB1: pathSegments=[] keyPath=[] itemKey=venue1
     
-    Note over GB1: Create group hash_TX, store keyToParentPath[venue1]=[]
-    GB1->>GB2: pathNames=[] path=[] key=hash_TX state
-    GB1->>GB2: pathNames=[cities] path=[hash_TX] key=hash_Dallas city, venue
+    Note over GB1: Create group hash_TX, store itemKeyToParentKeyPath[venue1]=[]
+    GB1->>GB2: pathSegments=[] keyPath=[] itemKey=hash_TX state
+    GB1->>GB2: pathSegments=[cities] keyPath=[hash_TX] itemKey=hash_Dallas city, venue
     
-    Note over GB2: Registered at scopePath=[cities]<br/>Receives path=[hash_TX] - this IS the context
-    Note over GB2: Create group hash_Dallas, store keyToParentPath[hash_Dallas]=[hash_TX]
+    Note over GB2: Registered at scopeSegments=[cities]<br/>Receives keyPath=[hash_TX] - this IS the context
+    Note over GB2: Create group hash_Dallas, store itemKeyToParentKeyPath[hash_Dallas]=[hash_TX]
     
-    GB2->>Builder: pathNames=[cities] path=[hash_TX] key=hash_Dallas city
-    GB2->>Builder: pathNames=[cities, venues] path=[hash_TX, hash_Dallas] key=venue1 venue
+    GB2->>Builder: pathSegments=[cities] keyPath=[hash_TX] itemKey=hash_Dallas city
+    GB2->>Builder: pathSegments=[cities, venues] keyPath=[hash_TX, hash_Dallas] itemKey=venue1 venue
     
-    Note over Builder: Full paths received - correct state updates
+    Note over Builder: Full key paths received - correct state updates
 ```
 
 ### 4.8 Key Advantages of Path-Aware Components
@@ -617,32 +617,32 @@ sequenceDiagram
 
 **Why path-aware components are correct:**
 
-1. **Path Context Flows Naturally:** When an item is added, the runtime `path` parameter contains the parent context (e.g., `[hash_TX]` for a city within Texas). This context is passed to handlers without transformation.
+1. **Key Path Context Flows Naturally:** When an item is added, the runtime `keyPath` parameter contains the parent context (e.g., `[hash_TX]` for a city within Texas). This context is passed to handlers without transformation.
 
-2. **Components Extend the Path:** When a path-aware GroupByStep emits events:
-   - Groups are emitted at the received `path` (preserving parent context)
-   - Items are emitted at `[...path, groupHash]` (extending with the new level)
+2. **Components Extend the Key Path:** When a path-aware GroupByStep emits events:
+   - Groups are emitted at the received `keyPath` (preserving parent context)
+   - Items are emitted at `[...keyPath, groupKey]` (extending with the new level)
 
-3. **Builder Receives Complete Paths:** Because each component extends rather than transforms the path, the builder always receives the full runtime path needed for correct state updates.
+3. **Builder Receives Complete Key Paths:** Because each component extends rather than transforms the key path, the builder always receives the full runtime key path needed for correct state updates.
 
-4. **No Map Overhead:** Unlike the wrapper approach, there's no need to maintain a `keyToOuterPrefix` map. The path context flows through the event system naturally.
+4. **No Map Overhead:** Unlike the wrapper approach, there's no need to maintain a `itemKeyToOuterPrefix` map. The key path context flows through the event system naturally.
 
 **Example Trace:**
 ```
-Input: path=[], key=venue1, props={state:TX, city:Dallas, venue:V1}
+Input: keyPath=[], itemKey=venue1, props={state:TX, city:Dallas, venue:V1}
 
-GB1 (scopePath=[]):
-  - Receives path=[], creates group hash_TX
-  - Emits group: path=[], key=hash_TX, {state:TX}
-  - Emits item: path=[hash_TX], key=hash_Dallas, {city:Dallas, venue:V1}
+GB1 (scopeSegments=[]):
+  - Receives keyPath=[], creates group hash_TX
+  - Emits group: keyPath=[], groupKey=hash_TX, {state:TX}
+  - Emits item: keyPath=[hash_TX], itemKey=hash_Dallas, {city:Dallas, venue:V1}
 
-GB2 (scopePath=[cities]):
-  - Registered at scopePath=[cities], receives path=[hash_TX]
+GB2 (scopeSegments=[cities]):
+  - Registered at scopeSegments=[cities], receives keyPath=[hash_TX]
   - Creates group hash_Dallas
-  - Emits group: path=[hash_TX], key=hash_Dallas, {city:Dallas}
-  - Emits item: path=[hash_TX, hash_Dallas], key=venue1, {venue:V1}
+  - Emits group: keyPath=[hash_TX], groupKey=hash_Dallas, {city:Dallas}
+  - Emits item: keyPath=[hash_TX, hash_Dallas], itemKey=venue1, {venue:V1}
 
-Builder receives all events with complete paths → correct state updates
+Builder receives all events with complete key paths → correct state updates
 ```
 
 ---
@@ -713,11 +713,11 @@ When the pipeline is built, the builder registers handlers for each path derived
 ```typescript
 // From builder.ts
 build(setState, typeDescriptor) {
-    const pathNames = getPathNamesFromDescriptor(typeDescriptor);
+    const pathSegments = getPathSegmentsFromDescriptor(typeDescriptor);
     
-    pathNames.forEach(pathName => {
-        this.lastStep.onAdded(pathName, (path, key, immutableProps) => {
-            setState(state => addToKeyedArray(state, pathName, path, key, immutableProps));
+    pathSegments.forEach(segmentPath => {
+        this.lastStep.onAdded(segmentPath, (keyPath, key, immutableProps) => {
+            setState(state => addToKeyedArray(state, segmentPath, keyPath, key, immutableProps));
         });
         // ... onRemoved, onModified
     });
@@ -733,11 +733,11 @@ With `in()`, the scoped step intercepts registrations and adjusts paths:
 
 // Root level registration
 step.onAdded([], handler);  
-// → Scoped translates to: input.onAdded([...scopePath], wrappedHandler)
+// → Scoped translates to: input.onAdded([...scopeSegments], wrappedHandler)
 
 // Scoped level registration  
 step.onAdded(['venues'], handler);
-// → Scoped translates to: input.onAdded([...scopePath, 'venues'], wrappedHandler)
+// → Scoped translates to: input.onAdded([...scopeSegments, 'venues'], wrappedHandler)
 ```
 
 ### 6.3 Path Translation Example
@@ -757,7 +757,7 @@ step.onAdded(['venues'], handler);
     ]
 }
 
-// Path names derived: [], ['cities'], ['cities', 'venues']
+// Path segments derived: [], ['cities'], ['cities', 'venues']
 
 // Registrations via ScopedStep:
 // - [] → Registered directly on input (state groups)
@@ -896,7 +896,7 @@ src/
 | File | Changes |
 |------|---------|
 | [`src/builder.ts`](../src/builder.ts) | Added `ScopedBuilder` class (lines 95-195), `in()` method on `PipelineBuilder` (lines 307-315) |
-| [`src/steps/group-by.ts`](../src/steps/group-by.ts) | Added `scopePath` parameter (default `[]`), updated event routing, added `PathsMatch`/`pathStartsWith` usage |
+| [`src/steps/group-by.ts`](../src/steps/group-by.ts) | Added `scopeSegments` parameter (default `[]`), updated event routing, added `pathsMatch`/`pathStartsWith` usage |
 
 ### 9.3 Key Implementation Decisions
 
@@ -916,27 +916,27 @@ src/
    - Handles both root-level (`scopePath = []`) and scoped operations
    - Previously used separate `ScopedDefinePropertyStep` class, but this has been unified
 
-4. **GroupByStep scopePath Integration**
-   - Added optional `scopePath` parameter with default `[]` for backward compatibility
-   - Modified handler registration to use scope path: `this.input.onAdded(this.scopePath, ...)`
+4. **GroupByStep scopeSegments Integration**
+   - Added optional `scopeSegments` parameter with default `[]` for backward compatibility
+   - Modified handler registration to use scope segments: `this.input.onAdded(this.scopeSegments, ...)`
    - Updated path level detection methods: `isAtGroupLevel()`, `isAtItemLevel()`, `isBelowItemLevel()`
-   - **Key change:** Removed `path.length === 0` enforcement, replaced with scope-aware path handling
+   - **Key change:** Removed `keyPath.length === 0` enforcement, replaced with scope-aware path handling
 
-5. **Full Path Construction in ScopedBuilder**
-   - For `commutativeAggregate` and `dropArray`, `ScopedBuilder` constructs the full path
-   - Pattern: `const fullPath = [...this.scopePath, arrayName];`
+5. **Full Segment Path Construction in ScopedBuilder**
+   - For `commutativeAggregate` and `dropArray`, `ScopedBuilder` constructs the full segment path
+   - Pattern: `const fullSegmentPath = [...this.scopeSegments, arrayName];`
    - This keeps the step implementations simple while `ScopedBuilder` handles path composition
 
 ### 9.4 Deviations from Original Design
 
 1. **DefinePropertyStep Unified Implementation**
    - **Original plan:** Create separate `ScopedDefinePropertyStep` for scoped operations
-   - **Actual:** Modified `DefinePropertyStep` to accept `scopePath` parameter (matching `DropPropertyStep` pattern)
+   - **Actual:** Modified `DefinePropertyStep` to accept `scopeSegments` parameter (matching `DropPropertyStep` pattern)
    - **Reason:** Unified approach is cleaner and more consistent; removed `ScopedDefinePropertyStep` class
 
 2. **DropPropertyStep Modified**
    - **Original plan:** Not implemented in `ScopedBuilder`
-   - **Actual:** Modified to accept `scopePath` parameter and unified with root-level behavior
+   - **Actual:** Modified to accept `scopeSegments` parameter and unified with root-level behavior
    - **Reason:** Needed for proper scoping behavior; matches the pattern used in `DefinePropertyStep`
 
 3. **CommutativeAggregateStep Not Modified**
@@ -975,10 +975,10 @@ These types enable full compile-time type safety for scoped operations.
 - [x] Add type tests for path navigation - [`src/test/types.path.test-d.ts`](../src/test/types.path.test-d.ts)
 
 ### Phase 2: Modify Existing Components to be Path-Aware ✅
-- [x] Modify `GroupByStep` to accept `scopePath` parameter - [`src/steps/group-by.ts:22`](../src/steps/group-by.ts:22)
-- [x] Remove `path.length === 0` enforcement in `GroupByStep` - Replaced with scope-aware handling
-- [x] Update `GroupByStep` to register handlers at `scopePath` level - [`src/steps/group-by.ts:25-30`](../src/steps/group-by.ts:25)
-- [x] Update `GroupByStep` to emit with extended runtime paths - [`src/steps/group-by.ts:196-231`](../src/steps/group-by.ts:196)
+- [x] Modify `GroupByStep` to accept `scopeSegments` parameter - [`src/steps/group-by.ts:22`](../src/steps/group-by.ts:22)
+- [x] Remove `keyPath.length === 0` enforcement in `GroupByStep` - Replaced with scope-aware handling
+- [x] Update `GroupByStep` to register handlers at `scopeSegments` level - [`src/steps/group-by.ts:25-30`](../src/steps/group-by.ts:25)
+- [x] Update `GroupByStep` to emit with extended runtime key paths - [`src/steps/group-by.ts:196-231`](../src/steps/group-by.ts:196)
 - [x] ~~Modify `DropArrayStep` signature~~ - Not needed; ScopedBuilder constructs full path
 - [x] ~~Modify `CommutativeAggregateStep`~~ - Not needed; ScopedBuilder constructs full path
 - [x] Modify `DefinePropertyStep` to accept `scopePath` parameter - [`src/steps/define-property.ts`](../src/steps/define-property.ts)

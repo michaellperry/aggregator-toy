@@ -61,15 +61,15 @@ class InputPipeline<T> implements Pipeline<T>, Step {
 From [`src/steps/group-by.ts:234-265`](../src/steps/group-by.ts:234):
 
 ```typescript
-private handleRemoved(path: string[], key: string) {
-    // Cannot access immutableProps - doesn't receive them!
-    const keyHash = this.keyToGroupHash.get(key);
+private handleRemoved(keyPath: string[], itemKey: string, immutableProps: ImmutableProps) {
+    // Now receives immutableProps!
+    const groupKey = this.itemKeyToGroupKey.get(itemKey);
     
-    // Notify item removed handlers - cannot pass immutableProps
-    this.itemRemovedHandlers.forEach(handler => handler([...parentPath, keyHash], key));
+    // Notify item removed handlers - can pass immutableProps
+    this.itemRemovedHandlers.forEach(handler => handler([...parentKeyPath, groupKey], itemKey, immutableProps));
     
     // ... group removal logic ...
-    this.groupRemovedHandlers.forEach(handler => handler(parentPath, keyHash));
+    this.groupRemovedHandlers.forEach(handler => handler(parentKeyPath, groupKey, immutableProps));
 }
 ```
 
@@ -94,9 +94,9 @@ The [`Step`](../src/pipeline.ts:38) interface's `onRemoved` method signature rem
 ```typescript
 export interface Step {
     getTypeDescriptor(): TypeDescriptor;
-    onAdded(pathNames: string[], handler: AddedHandler): void;
-    onRemoved(pathNames: string[], handler: RemovedHandler): void;  // No change needed
-    onModified(pathNames: string[], handler: ModifiedHandler): void;
+    onAdded(pathSegments: string[], handler: AddedHandler): void;
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void;  // No change needed
+    onModified(pathSegments: string[], handler: ModifiedHandler): void;
 }
 ```
 
@@ -129,8 +129,8 @@ class InputPipeline<T> implements Pipeline<T>, Step {
         // If item not found, silently ignore (already removed)
     }
 
-    onRemoved(path: string[], handler: RemovedHandler): void {
-        if (path.length === 0) {
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+        if (pathSegments.length === 0) {
             this.removedHandlers.push(handler);
         }
     }
@@ -156,15 +156,15 @@ class InputPipeline<T> implements Pipeline<T>, Step {
 The implementation re-extracts key and non-key props from the received `immutableProps`:
 
 ```typescript
-private handleRemoved(path: string[], key: string, immutableProps: ImmutableProps) {
-    // Extract key and non-key props from received immutableProps
-    let keyProps: ImmutableProps = {};
-    let nonKeyProps: ImmutableProps = {};
+private handleRemoved(keyPath: string[], itemKey: string, immutableProps: ImmutableProps) {
+    // Extract grouping and non-grouping props from received immutableProps
+    let groupingValues: ImmutableProps = {};
+    let nonGroupingProps: ImmutableProps = {};
     Object.keys(immutableProps).forEach(prop => {
-        if (this.keyProperties.includes(prop as K)) {
-            keyProps[prop] = immutableProps[prop];
+        if (this.groupingProperties.includes(prop as K)) {
+            groupingValues[prop] = immutableProps[prop];
         } else {
-            nonKeyProps[prop] = immutableProps[prop];
+            nonGroupingProps[prop] = immutableProps[prop];
         }
     });
     
@@ -179,11 +179,11 @@ This approach requires no additional storage since `immutableProps` is now avail
 The nested path removal interceptors forward `immutableProps` through the handler chain:
 
 ```typescript
-this.input.onRemoved([...this.scopePath, ...shiftedPath], (notifiedPath, key, immutableProps) => {
-    const itemHash = notifiedPath[this.scopePath.length];
-    const groupHash = this.keyToGroupHash.get(itemHash);
+this.input.onRemoved([...this.scopeSegments, ...shiftedSegments], (notifiedKeyPath, itemKey, immutableProps) => {
+    const itemKeyAtScope = notifiedKeyPath[this.scopeSegments.length];
+    const groupKey = this.itemKeyToGroupKey.get(itemKeyAtScope);
     // ...
-    handler(modifiedPath, key, immutableProps);  // Pass through immutableProps
+    handler(modifiedKeyPath, itemKey, immutableProps);  // Pass through immutableProps
 });
 ```
 
@@ -198,22 +198,22 @@ With `immutableProps` available in removal events, the [`itemStore`](../src/step
 class CommutativeAggregateStep {
     // No itemStore needed!
     
-    private handleItemAdded(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
+    private handleItemAdded(keyPath: string[], itemKey: string, item: ImmutableProps): void {
         // No storage needed - item passed directly
-        const parentHash = computePathHash(runtimePath);
+        const parentKeyHash = computeKeyPathHash(keyPath);
         
-        const currentAggregate = this.aggregateValues.get(parentHash);
+        const currentAggregate = this.aggregateValues.get(parentKeyHash);
         const newAggregate = this.config.add(currentAggregate, item);
-        this.aggregateValues.set(parentHash, newAggregate);
+        this.aggregateValues.set(parentKeyHash, newAggregate);
         
         // ... emit modification ...
     }
     
-    private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
+    private handleItemRemoved(keyPath: string[], itemKey: string, item: ImmutableProps): void {
         // item is now passed as parameter!
-        const parentHash = computePathHash(runtimePath);
+        const parentKeyHash = computeKeyPathHash(keyPath);
         
-        const currentAggregate = this.aggregateValues.get(parentHash);
+        const currentAggregate = this.aggregateValues.get(parentKeyHash);
         const newAggregate = this.config.subtract(currentAggregate!, item);
         
         // ... rest of logic ...
@@ -226,7 +226,7 @@ class CommutativeAggregateStep {
 The [`itemStore`](../src/steps/min-max-aggregate.ts:27) simplification follows the same pattern:
 
 ```typescript
-private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
+private handleItemRemoved(keyPath: string[], itemKey: string, item: ImmutableProps): void {
     // item is received as parameter - no lookup needed!
     const value = item[this.numericProperty];
     // ... rest of logic ...
@@ -259,8 +259,8 @@ The [`itemStore`](../src/steps/pick-by-min-max.ts:53) follows the same pattern.
 [`DefinePropertyStep`](../src/steps/define-property.ts:29) passes through removal events with the updated signature:
 
 ```typescript
-onRemoved(pathNames: string[], handler: RemovedHandler): void {
-    this.input.onRemoved(pathNames, handler);  // Handler signature includes immutableProps
+onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+    this.input.onRemoved(pathSegments, handler);  // Handler signature includes immutableProps
 }
 ```
 
@@ -269,20 +269,20 @@ onRemoved(pathNames: string[], handler: RemovedHandler): void {
 [`DropPropertyStep`](../src/steps/drop-property.ts:119) now filters `immutableProps` to remove dropped properties during removal:
 
 ```typescript
-onRemoved(pathNames: string[], handler: RemovedHandler): void {
+onRemoved(pathSegments: string[], handler: RemovedHandler): void {
     if (this.isArrayProperty) {
-        if (this.isAtOrBelowTargetArray(pathNames)) {
+        if (this.isAtOrBelowTargetArray(pathSegments)) {
             return;  // Suppress
         }
     }
     // For property suppression on removal, filter immutableProps
-    if (!this.isArrayProperty && this.isAtScopePath(pathNames)) {
-        this.input.onRemoved(pathNames, (path, key, immutableProps) => {
+    if (!this.isArrayProperty && this.isAtScopeSegments(pathSegments)) {
+        this.input.onRemoved(pathSegments, (keyPath, key, immutableProps) => {
             const { [this.propertyName]: _, ...rest } = immutableProps;
-            handler(path, key, rest as Omit<T, K>);
+            handler(keyPath, key, rest as Omit<T, K>);
         });
     } else {
-        this.input.onRemoved(pathNames, handler);
+        this.input.onRemoved(pathSegments, handler);
     }
 }
 ```
@@ -296,9 +296,9 @@ onRemoved(pathNames: string[], handler: RemovedHandler): void {
 The [`build()`](../src/builder.ts:477) method's removal handler now receives `immutableProps`:
 
 ```typescript
-this.lastStep.onRemoved(pathName, (path, key, immutableProps) => {
+this.lastStep.onRemoved(segmentPath, (keyPath, key, immutableProps) => {
     // immutableProps available but not needed for removal from keyed array
-    setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
+    setState(state => removeFromKeyedArray(state, segmentPath, keyPath, key) as KeyedArray<T>);
 });
 ```
 
@@ -446,14 +446,14 @@ flowchart TD
     end
     
     subgraph GroupByStep
-        SPLIT_ADD[Split into keyProps and nonKeyProps]
-        STORE_MAPPING[Store key->groupHash mapping]
-        GROUP_ADD[Emit group added with keyProps]
+        SPLIT_ADD[Split into groupingValues and nonGroupingProps]
+        STORE_MAPPING[Store itemKey->groupKey mapping]
+        GROUP_ADD[Emit group added with groupingValues]
         ITEM_ADD[Emit item added with nonKeyProps]
         
         SPLIT_REM[Re-split fullProps on removal]
         ITEM_REM[Emit item removed with nonKeyProps]
-        GROUP_REM[Emit group removed with keyProps if empty]
+        GROUP_REM[Emit group removed with groupingValues if empty]
     end
     
     ADD --> SPLIT_ADD

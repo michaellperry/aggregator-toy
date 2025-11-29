@@ -36,10 +36,10 @@ interface CommutativeAggregateConfig<TItem, TAggregate> {
 }
 
 /**
- * Computes a hash key for a path (for map lookups).
+ * Computes a hash key for a key path (for map lookups).
  */
-function computePathHash(path: string[]): string {
-    return path.join('::');
+function computeKeyPathHash(keyPath: string[]): string {
+    return keyPath.join('::');
 }
 
 /**
@@ -57,7 +57,7 @@ function computePathHash(path: string[]): string {
  * - This follows the system pattern: mutable/computed properties use onModified
  *
  * @template TInput - The input type to the step
- * @template TPath - The tuple of array names forming the path to the target array
+ * @template TPath - The tuple of array name segments forming the path to the target array
  * @template TPropertyName - The name of the new aggregate property
  * @template TAggregate - The type of the aggregate value
  */
@@ -68,31 +68,31 @@ export class CommutativeAggregateStep<
     TAggregate
 > implements Step {
     
-    /** Maps parent path hash to current aggregate value */
+    /** Maps parent key path hash to current aggregate value */
     private aggregateValues: Map<string, TAggregate> = new Map();
     
-    /** Maps parent path hash to count of items (for cleanup tracking) */
+    /** Maps parent key path hash to count of items (for cleanup tracking) */
     private itemCounts: Map<string, number> = new Map();
     
     /** Handlers for modified events at various levels */
     private modifiedHandlers: Array<{
-        pathNames: string[];
+        pathSegments: string[];
         handler: ModifiedHandler;
     }> = [];
     
     constructor(
         private input: Step,
-        private arrayPath: TPath,
+        private segmentPath: TPath,
         private propertyName: TPropertyName,
         private config: CommutativeAggregateConfig<ImmutableProps, TAggregate>
     ) {
         // Register with input step to receive item add/remove events at the target array level
-        this.input.onAdded(this.arrayPath, (path, key, immutableProps) => {
-            this.handleItemAdded(path, key, immutableProps);
+        this.input.onAdded(this.segmentPath, (keyPath, itemKey, immutableProps) => {
+            this.handleItemAdded(keyPath, itemKey, immutableProps);
         });
         
-        this.input.onRemoved(this.arrayPath, (path, key, immutableProps) => {
-            this.handleItemRemoved(path, key, immutableProps);
+        this.input.onRemoved(this.segmentPath, (keyPath, itemKey, immutableProps) => {
+            this.handleItemRemoved(keyPath, itemKey, immutableProps);
         });
     }
     
@@ -100,69 +100,69 @@ export class CommutativeAggregateStep<
         return this.input.getTypeDescriptor();
     }
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        this.input.onAdded(pathNames, handler);
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
+        this.input.onAdded(pathSegments, handler);
     }
     
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        this.input.onRemoved(pathNames, handler);
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+        this.input.onRemoved(pathSegments, handler);
     }
     
-    onModified(pathNames: string[], handler: ModifiedHandler): void {
-        if (this.isParentPath(pathNames)) {
+    onModified(pathSegments: string[], handler: ModifiedHandler): void {
+        if (this.isParentPath(pathSegments)) {
             // Handler wants modification events at parent level
             // This is the channel for receiving aggregate values
             this.modifiedHandlers.push({
-                pathNames,
+                pathSegments,
                 handler
             });
         }
         // Always pass through to input for other property modifications
-        this.input.onModified(pathNames, handler);
+        this.input.onModified(pathSegments, handler);
     }
     
     /**
-     * Checks if the given path represents the parent level (where aggregate property lives)
+     * Checks if the given path segments represent the parent level (where aggregate property lives)
      */
-    private isParentPath(pathNames: string[]): boolean {
-        // Parent path is arrayPath without the last element
-        const parentPath = this.arrayPath.slice(0, -1);
+    private isParentPath(pathSegments: string[]): boolean {
+        // Parent path segments are segmentPath without the last element
+        const parentSegments = this.segmentPath.slice(0, -1);
         
-        if (pathNames.length !== parentPath.length) {
+        if (pathSegments.length !== parentSegments.length) {
             return false;
         }
         
-        return pathNames.every((name, i) => name === parentPath[i]);
+        return pathSegments.every((segment, i) => segment === parentSegments[i]);
     }
     
     /**
      * Handle when an item is added to the target array
      */
-    private handleItemAdded(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
-        // runtimePath contains the hash keys leading to this item
-        // For arrayPath ['cities', 'venues'], runtimePath might be ['hash_TX', 'hash_Dallas']
+    private handleItemAdded(keyPath: string[], itemKey: string, item: ImmutableProps): void {
+        // keyPath contains the runtime keys leading to this item
+        // For segmentPath ['cities', 'venues'], keyPath might be ['hash_TX', 'hash_Dallas']
         
-        const parentPath = runtimePath;
-        const parentHash = computePathHash(parentPath);
+        const parentKeyPath = keyPath;
+        const parentKeyHash = computeKeyPathHash(parentKeyPath);
         
         // Track item count for cleanup
-        const currentCount = this.itemCounts.get(parentHash) ?? 0;
-        this.itemCounts.set(parentHash, currentCount + 1);
+        const currentCount = this.itemCounts.get(parentKeyHash) ?? 0;
+        this.itemCounts.set(parentKeyHash, currentCount + 1);
         
         // Compute new aggregate
-        const currentAggregate = this.aggregateValues.get(parentHash);
+        const currentAggregate = this.aggregateValues.get(parentKeyHash);
         const newAggregate = this.config.add(currentAggregate, item);
-        this.aggregateValues.set(parentHash, newAggregate);
+        this.aggregateValues.set(parentKeyHash, newAggregate);
         
         // Emit modification event
-        // The parent key is the last element of parentPath
-        // The path to the parent is everything before that
-        if (parentPath.length > 0) {
-            const parentKey = parentPath[parentPath.length - 1];
-            const pathToParent = parentPath.slice(0, -1);
+        // The parent key is the last element of parentKeyPath
+        // The key path to the parent is everything before that
+        if (parentKeyPath.length > 0) {
+            const parentKey = parentKeyPath[parentKeyPath.length - 1];
+            const keyPathToParent = parentKeyPath.slice(0, -1);
             
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler(pathToParent, parentKey, this.propertyName, newAggregate);
+                handler(keyPathToParent, parentKey, this.propertyName, newAggregate);
             });
         } else {
             // Parent is at root level - edge case
@@ -178,38 +178,38 @@ export class CommutativeAggregateStep<
     /**
      * Handle when an item is removed from the target array
      */
-    private handleItemRemoved(runtimePath: string[], itemKey: string, item: ImmutableProps): void {
-        const parentPath = runtimePath;
-        const parentHash = computePathHash(parentPath);
+    private handleItemRemoved(keyPath: string[], itemKey: string, item: ImmutableProps): void {
+        const parentKeyPath = keyPath;
+        const parentKeyHash = computeKeyPathHash(parentKeyPath);
         
         // Get current aggregate
-        const currentAggregate = this.aggregateValues.get(parentHash);
+        const currentAggregate = this.aggregateValues.get(parentKeyHash);
         if (currentAggregate === undefined) {
-            throw new Error(`No aggregate value for parent ${parentHash}`);
+            throw new Error(`No aggregate value for parent ${parentKeyHash}`);
         }
         
         // Compute new aggregate
         const newAggregate = this.config.subtract(currentAggregate, item);
         
         // Update item count and clean up if no items remain
-        const currentCount = this.itemCounts.get(parentHash) ?? 0;
+        const currentCount = this.itemCounts.get(parentKeyHash) ?? 0;
         const newCount = currentCount - 1;
         
         if (newCount > 0) {
-            this.itemCounts.set(parentHash, newCount);
-            this.aggregateValues.set(parentHash, newAggregate);
+            this.itemCounts.set(parentKeyHash, newCount);
+            this.aggregateValues.set(parentKeyHash, newAggregate);
         } else {
-            this.itemCounts.delete(parentHash);
-            this.aggregateValues.delete(parentHash);
+            this.itemCounts.delete(parentKeyHash);
+            this.aggregateValues.delete(parentKeyHash);
         }
         
         // Emit modification event
-        if (parentPath.length > 0) {
-            const parentKey = parentPath[parentPath.length - 1];
-            const pathToParent = parentPath.slice(0, -1);
+        if (parentKeyPath.length > 0) {
+            const parentKey = parentKeyPath[parentKeyPath.length - 1];
+            const keyPathToParent = parentKeyPath.slice(0, -1);
             
             this.modifiedHandlers.forEach(({ handler }) => {
-                handler(pathToParent, parentKey, this.propertyName, newAggregate);
+                handler(keyPathToParent, parentKey, this.propertyName, newAggregate);
             });
         } else {
             this.modifiedHandlers.forEach(({ handler }) => {

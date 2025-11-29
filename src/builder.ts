@@ -1,4 +1,4 @@
-import { getPathNamesFromDescriptor, type ImmutableProps, type Pipeline, type Step, type TypeDescriptor } from './pipeline';
+import { getPathSegmentsFromDescriptor, type ImmutableProps, type Pipeline, type Step, type TypeDescriptor } from './pipeline';
 import { CommutativeAggregateStep, type AddOperator, type SubtractOperator } from './steps/commutative-aggregate';
 import { DefinePropertyStep } from './steps/define-property';
 import { DropPropertyStep } from './steps/drop-property';
@@ -76,7 +76,7 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
     constructor(
         private input: Pipeline<TStart>,
         private lastStep: Step,
-        private scopePath: Path = [] as unknown as Path
+        private scopeSegments: Path = [] as unknown as Path
     ) {}
 
     defineProperty<K extends string, U>(propertyName: K, compute: (item: NavigateToPath<T, Path>) => U): PipelineBuilder<
@@ -89,7 +89,7 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             this.lastStep,
             propertyName,
             compute as (item: unknown) => U,
-            this.scopePath as string[]
+            this.scopeSegments as string[]
         );
         return new PipelineBuilder(this.input, newStep) as any;
     }
@@ -103,13 +103,13 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
         const newStep = new DropPropertyStep<NavigateToPath<T, Path>, K>(
             this.lastStep,
             propertyName,
-            this.scopePath as string[]
+            this.scopeSegments as string[]
         );
         return new PipelineBuilder(this.input, newStep) as any;
     }
 
     groupBy<K extends keyof NavigateToPath<T, Path>, ArrayName extends string>(
-        keyProperties: K[],
+        groupingProperties: K[],
         arrayName: ArrayName
     ): PipelineBuilder<
         Path extends []
@@ -119,9 +119,9 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
     > {
         const newStep = new GroupByStep<NavigateToPath<T, Path> & {}, K, ArrayName>(
             this.lastStep,
-            keyProperties as K[],
+            groupingProperties as K[],
             arrayName,
-            this.scopePath as string[]
+            this.scopeSegments as string[]
         );
         return new PipelineBuilder(this.input, newStep) as any;
     }
@@ -170,10 +170,10 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<PropName, TAggregate>>>,
         TStart
     > {
-        const fullPath = [...this.scopePath, arrayName];
+        const fullSegmentPath = [...this.scopeSegments, arrayName];
         const newStep = new CommutativeAggregateStep(
             this.lastStep,
-            fullPath,
+            fullSegmentPath,
             propertyName,
             { 
                 add: add as AddOperator<ImmutableProps, any>, 
@@ -280,10 +280,10 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>,
         TStart
     > {
-        const fullPath = [...this.scopePath, arrayName];
+        const fullSegmentPath = [...this.scopeSegments, arrayName];
         const newStep = new MinMaxAggregateStep(
             this.lastStep,
-            fullPath,
+            fullSegmentPath,
             outputProperty,
             propertyName,
             (values) => Math.min(...values)
@@ -316,10 +316,10 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>,
         TStart
     > {
-        const fullPath = [...this.scopePath, arrayName];
+        const fullSegmentPath = [...this.scopeSegments, arrayName];
         const newStep = new MinMaxAggregateStep(
             this.lastStep,
-            fullPath,
+            fullSegmentPath,
             outputProperty,
             propertyName,
             (values) => Math.max(...values)
@@ -352,10 +352,10 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, number | undefined>>>,
         TStart
     > {
-        const fullPath = [...this.scopePath, arrayName];
+        const fullSegmentPath = [...this.scopeSegments, arrayName];
         const newStep = new AverageAggregateStep(
             this.lastStep,
-            fullPath,
+            fullSegmentPath,
             outputProperty,
             propertyName
         );
@@ -388,10 +388,10 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> | undefined>>>,
         TStart
     > {
-        const fullPath = [...this.scopePath, arrayName];
+        const fullSegmentPath = [...this.scopeSegments, arrayName];
         const newStep = new PickByMinMaxStep(
             this.lastStep,
-            fullPath,
+            fullSegmentPath,
             outputProperty,
             propertyName,
             (value1, value2) => {
@@ -434,10 +434,10 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
             : Expand<TransformAtPath<T, Path, NavigateToPath<T, Path> & Record<TPropName, NavigateToArrayItem<NavigateToPath<T, Path>, [ArrayName]> | undefined>>>,
         TStart
     > {
-        const fullPath = [...this.scopePath, arrayName];
+        const fullSegmentPath = [...this.scopeSegments, arrayName];
         const newStep = new PickByMinMaxStep(
             this.lastStep,
-            fullPath,
+            fullSegmentPath,
             outputProperty,
             propertyName,
             (value1, value2) => {
@@ -467,7 +467,7 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
         return new PipelineBuilder<T, TStart, [...Path, ...NewPath]>(
             this.input,
             this.lastStep,
-            [...this.scopePath, ...pathSegments] as [...Path, ...NewPath]
+            [...this.scopeSegments, ...pathSegments] as [...Path, ...NewPath]
         );
     }
 
@@ -497,9 +497,9 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
         const newStep = new FilterStep<NavigateToPath<T, Path>>(
             this.lastStep,
             predicate as (item: unknown) => boolean,
-            this.scopePath as string[]
+            this.scopeSegments as string[]
         );
-        return new PipelineBuilder(this.input, newStep, this.scopePath) as any;
+        return new PipelineBuilder(this.input, newStep, this.scopeSegments) as any;
     }
 
     getTypeDescriptor(): TypeDescriptor {
@@ -507,20 +507,20 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
     }
 
     build(setState: (transform: Transform<KeyedArray<T>>) => void, typeDescriptor: TypeDescriptor): Pipeline<TStart> {
-        const pathNames = getPathNamesFromDescriptor(typeDescriptor);
+        const pathSegments = getPathSegmentsFromDescriptor(typeDescriptor);
         
         // Register handlers for each path the step will emit
-        pathNames.forEach(pathName => {
-            this.lastStep.onAdded(pathName, (path, key, immutableProps) => {
-                setState(state => addToKeyedArray(state, pathName, path, key, immutableProps) as KeyedArray<T>);
+        pathSegments.forEach(segmentPath => {
+            this.lastStep.onAdded(segmentPath, (keyPath, key, immutableProps) => {
+                setState(state => addToKeyedArray(state, segmentPath, keyPath, key, immutableProps) as KeyedArray<T>);
             });
             
-            this.lastStep.onRemoved(pathName, (path, key, immutableProps) => {
-                setState(state => removeFromKeyedArray(state, pathName, path, key) as KeyedArray<T>);
+            this.lastStep.onRemoved(segmentPath, (keyPath, key, immutableProps) => {
+                setState(state => removeFromKeyedArray(state, segmentPath, keyPath, key) as KeyedArray<T>);
             });
             
-            this.lastStep.onModified(pathName, (path, key, name, value) => {
-                setState(state => modifyInKeyedArray(state, pathName, path, key, name, value) as KeyedArray<T>);
+            this.lastStep.onModified(segmentPath, (keyPath, key, name, value) => {
+                setState(state => modifyInKeyedArray(state, segmentPath, keyPath, key, name, value) as KeyedArray<T>);
             });
         });
         
@@ -528,31 +528,31 @@ export class PipelineBuilder<T extends {}, TStart, Path extends string[] = []> {
     }
 }
 
-function addToKeyedArray(state: KeyedArray<any>, pathName: string[], path: string[], key: string, immutableProps: ImmutableProps): KeyedArray<any> {
-    if (pathName.length === 0) {
-        if (path.length !== 0) {
+function addToKeyedArray(state: KeyedArray<any>, segmentPath: string[], keyPath: string[], key: string, immutableProps: ImmutableProps): KeyedArray<any> {
+    if (segmentPath.length === 0) {
+        if (keyPath.length !== 0) {
             throw new Error("Mismatched path length when setting state");
         }
         return [...state, { key, value: immutableProps }];
     }
     else {
-        if (path.length === 0) {
+        if (keyPath.length === 0) {
             throw new Error("Mismatched path length when setting state");
         }
-        const parentKey = path[0];
-        const arrayName = pathName[0];
+        const parentKey = keyPath[0];
+        const segment = segmentPath[0];
         const existingItemIndex = state.findIndex(item => item.key === parentKey);
         if (existingItemIndex < 0) {
             throw new Error("Path references unknown item when setting state");
         }
         const existingItem = state[existingItemIndex];
-        const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
-        const modifiedArray = addToKeyedArray(existingArray, pathName.slice(1), path.slice(1), key, immutableProps);
+        const existingArray = existingItem.value[segment] as KeyedArray<any> || [];
+        const modifiedArray = addToKeyedArray(existingArray, segmentPath.slice(1), keyPath.slice(1), key, immutableProps);
         const modifiedItem = {
             key: parentKey,
             value: {
                 ...existingItem.value,
-                [pathName[0]]: modifiedArray
+                [segmentPath[0]]: modifiedArray
             }
         };
         return [
@@ -563,31 +563,31 @@ function addToKeyedArray(state: KeyedArray<any>, pathName: string[], path: strin
     }
 }
 
-function removeFromKeyedArray(state: KeyedArray<any>, pathName: string[], path: string[], key: string): KeyedArray<any> {
-    if (pathName.length === 0) {
-        if (path.length !== 0) {
+function removeFromKeyedArray(state: KeyedArray<any>, segmentPath: string[], keyPath: string[], key: string): KeyedArray<any> {
+    if (segmentPath.length === 0) {
+        if (keyPath.length !== 0) {
             throw new Error("Mismatched path length when removing from state");
         }
         return state.filter(item => item.key !== key);
     }
     else {
-        if (path.length === 0) {
+        if (keyPath.length === 0) {
             throw new Error("Mismatched path length when removing from state");
         }
-        const parentKey = path[0];
-        const arrayName = pathName[0];
+        const parentKey = keyPath[0];
+        const segment = segmentPath[0];
         const existingItemIndex = state.findIndex(item => item.key === parentKey);
         if (existingItemIndex < 0) {
             throw new Error("Path references unknown item when removing from state");
         }
         const existingItem = state[existingItemIndex];
-        const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
-        const modifiedArray = removeFromKeyedArray(existingArray, pathName.slice(1), path.slice(1), key);
+        const existingArray = existingItem.value[segment] as KeyedArray<any> || [];
+        const modifiedArray = removeFromKeyedArray(existingArray, segmentPath.slice(1), keyPath.slice(1), key);
         const modifiedItem = {
             key: parentKey,
             value: {
                 ...existingItem.value,
-                [pathName[0]]: modifiedArray
+                [segmentPath[0]]: modifiedArray
             }
         };
         return [
@@ -598,9 +598,9 @@ function removeFromKeyedArray(state: KeyedArray<any>, pathName: string[], path: 
     }
 }
 
-function modifyInKeyedArray(state: KeyedArray<any>, pathName: string[], path: string[], key: string, name: string, value: any): KeyedArray<any> {
-    if (pathName.length === 0) {
-        if (path.length !== 0) {
+function modifyInKeyedArray(state: KeyedArray<any>, segmentPath: string[], keyPath: string[], key: string, name: string, value: any): KeyedArray<any> {
+    if (segmentPath.length === 0) {
+        if (keyPath.length !== 0) {
             throw new Error("Mismatched path length when modifying state");
         }
         const existingItemIndex = state.findIndex(item => item.key === key);
@@ -622,23 +622,23 @@ function modifyInKeyedArray(state: KeyedArray<any>, pathName: string[], path: st
         ];
     }
     else {
-        if (path.length === 0) {
+        if (keyPath.length === 0) {
             throw new Error("Mismatched path length when modifying state");
         }
-        const parentKey = path[0];
-        const arrayName = pathName[0];
+        const parentKey = keyPath[0];
+        const segment = segmentPath[0];
         const existingItemIndex = state.findIndex(item => item.key === parentKey);
         if (existingItemIndex < 0) {
             throw new Error("Path references unknown item when modifying state");
         }
         const existingItem = state[existingItemIndex];
-        const existingArray = existingItem.value[arrayName] as KeyedArray<any> || [];
-        const modifiedArray = modifyInKeyedArray(existingArray, pathName.slice(1), path.slice(1), key, name, value);
+        const existingArray = existingItem.value[segment] as KeyedArray<any> || [];
+        const modifiedArray = modifyInKeyedArray(existingArray, segmentPath.slice(1), keyPath.slice(1), key, name, value);
         const modifiedItem = {
             key: parentKey,
             value: {
                 ...existingItem.value,
-                [pathName[0]]: modifiedArray
+                [segmentPath[0]]: modifiedArray
             }
         };
         return [

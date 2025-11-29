@@ -2,8 +2,8 @@ import { encode as base64Encode } from '@stablelib/base64';
 import { hash as sha512Hash } from '@stablelib/sha512';
 import { encode as utf8Encode } from '@stablelib/utf8';
 
-export function canonicalizeKeyProperties(obj: {}, keyProps: string[]): string {
-    const sortedProps = [...keyProps].sort();
+export function canonicalizeGroupingProperties(obj: {}, groupingProperties: string[]): string {
+    const sortedProps = [...groupingProperties].sort();
     const keyObject: Record<string, any> = {};
     for (const prop of sortedProps) {
         if (prop in obj) {
@@ -19,8 +19,8 @@ function computeHash(str: string): string {
     return base64Encode(hashBytes);
 }
 
-export function computeKeyHash(obj: {}, keyProps: string[]): string {
-    const canonical = canonicalizeKeyProperties(obj, keyProps);
+export function computeGroupKey(obj: {}, groupingProperties: string[]): string {
+    const canonical = canonicalizeGroupingProperties(obj, groupingProperties);
     return computeHash(canonical);
 }
 

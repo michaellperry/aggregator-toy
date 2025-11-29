@@ -92,13 +92,13 @@ class CommutativeAggregateStep<
     
     /** Handlers for modified events at the parent level */
     private modifiedHandlers: Array<{
-        pathNames: string[];
+        pathSegments: string[];
         handler: ModifiedHandler;
     }> = [];
     
     constructor(
         private input: Step,
-        private arrayPath: TPath,
+        private segmentPath: TPath,
         private propertyName: TPropName,
         private config: CommutativeAggregateConfig<TItem, TAggregate>
     ) {
@@ -109,16 +109,16 @@ class CommutativeAggregateStep<
         // Returns modified descriptor with array removed at target level
     }
     
-    onAdded(pathNames: string[], handler: AddedHandler): void {
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
         // Routes added events at parent level with IMMUTABLE properties only
         // Does NOT include the aggregate value (aggregate is mutable)
     }
     
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
         // Routes removed events
     }
     
-    onModified(pathNames: string[], handler: ModifiedHandler): void {
+    onModified(pathSegments: string[], handler: ModifiedHandler): void {
         // Registers handlers for aggregate property changes
         // This is the ONLY channel for communicating aggregate values
     }
@@ -386,7 +386,7 @@ class PipelineBuilder<TStart, T extends {}> {
      * The aggregate is computed incrementally as items are added or removed.
      * The target array is replaced with the aggregate property in the output type.
      * 
-     * @param arrayPath - Path of array names to navigate to the target array
+     * @param segmentPath - Path segments (array names) to navigate to the target array
      * @param propertyName - Name of the new aggregate property
      * @param add - Operator called when an item is added
      * @param subtract - Operator called when an item is removed
@@ -405,7 +405,7 @@ class PipelineBuilder<TStart, T extends {}> {
         PropName extends string,
         TAggregate
     >(
-        arrayPath: Path,
+        segmentPath: Path,
         propertyName: PropName,
         add: AddOperator<NavigateToArrayItem<T, Path>, TAggregate>,
         subtract: SubtractOperator<NavigateToArrayItem<T, Path>, TAggregate>
@@ -601,21 +601,21 @@ class CommutativeAggregateStep<TItem, TAggregate, TPath, TPropName> {
 
 ```typescript
 /**
- * Computes the parent path from a full runtime path.
- * The parent path excludes the item's own key.
+ * Computes the parent key path from a full runtime key path.
+ * The parent key path excludes the item's own key.
  * 
- * @param fullPath - Full runtime path including item key
- * @returns Parent path (all but the last element)
+ * @param fullKeyPath - Full runtime key path including item key
+ * @returns Parent key path (all but the last element)
  */
-function getParentPath(fullPath: string[]): string[] {
-    return fullPath.slice(0, -1);
+function getParentKeyPath(fullKeyPath: string[]): string[] {
+    return fullKeyPath.slice(0, -1);
 }
 
 /**
- * Computes a hash key for a path (for map lookups).
+ * Computes a hash key for a key path (for map lookups).
  */
-function computePathHash(path: string[]): string {
-    return path.join('::');
+function computeKeyPathHash(keyPath: string[]): string {
+    return keyPath.join('::');
 }
 ```
 
@@ -674,26 +674,26 @@ flowchart TD
 **Critical Design Decision:** The aggregate value is NOT included in `onAdded` payloads. Aggregates are mutable/computed values and are communicated ONLY via `onModified`.
 
 ```typescript
-onAdded(pathNames: string[], handler: AddedHandler): void {
-    if (this.isParentPath(pathNames)) {
+onAdded(pathSegments: string[], handler: AddedHandler): void {
+    if (this.isParentSegments(pathSegments)) {
         // Handler wants events at the parent level (where aggregate lives)
         // Pass through ONLY immutable properties - do NOT inject aggregate
-        const parentPathInInput = this.getInputParentPath(pathNames);
-        this.input.onAdded(parentPathInInput, (path, key, immutableProps) => {
+        const parentSegmentsInInput = this.getInputParentSegments(pathSegments);
+        this.input.onAdded(parentSegmentsInInput, (keyPath, key, immutableProps) => {
             // Pass through immutable properties ONLY
             // Aggregate value is NOT included - it's delivered via onModified
-            handler(path, key, immutableProps);
+            handler(keyPath, key, immutableProps);
         });
-    } else if (this.isBelowTargetArray(pathNames)) {
+    } else if (this.isBelowTargetArray(pathSegments)) {
         // Handler wants events below the target array
         // These are blocked - the array no longer exists in output
         throw new Error(
-            `Cannot register handler at path ${pathNames.join('.')} - ` +
-            `array ${this.arrayPath[this.arrayPath.length - 1]} has been aggregated`
+            `Cannot register handler at path segments ${pathSegments.join('.')} - ` +
+            `array ${this.segmentPath[this.segmentPath.length - 1]} has been aggregated`
         );
     } else {
-        // Handler wants events at unrelated path - pass through
-        this.input.onAdded(pathNames, handler);
+        // Handler wants events at unrelated path segments - pass through
+        this.input.onAdded(pathSegments, handler);
     }
 }
 
@@ -732,7 +732,7 @@ The `TypeDescriptor` must be updated to remove the target array from the tree:
 ```typescript
 getTypeDescriptor(): TypeDescriptor {
     const inputDescriptor = this.input.getTypeDescriptor();
-    return this.transformDescriptor(inputDescriptor, this.arrayPath);
+    return this.transformDescriptor(inputDescriptor, this.segmentPath);
 }
 
 private transformDescriptor(
@@ -770,27 +770,27 @@ private transformDescriptor(
 ### 4.6 Handling Item Addition
 
 ```typescript
-private handleItemAdded(runtimePath: string[], itemKey: string, item: TItem): void {
-    const parentPath = getParentPath(runtimePath);
-    const parentHash = computePathHash(parentPath);
+private handleItemAdded(keyPath: string[], itemKey: string, item: TItem): void {
+    const parentKeyPath = getParentKeyPath(keyPath);
+    const parentKeyHash = computeKeyPathHash(parentKeyPath);
     
     // Store item for later removal
-    if (!this.itemsByParent.has(parentHash)) {
-        this.itemsByParent.set(parentHash, new Map());
+    if (!this.itemsByParent.has(parentKeyHash)) {
+        this.itemsByParent.set(parentKeyHash, new Map());
     }
-    this.itemsByParent.get(parentHash)!.set(itemKey, item);
+    this.itemsByParent.get(parentKeyHash)!.set(itemKey, item);
     
     // Compute new aggregate
-    const currentAggregate = this.aggregateValues.get(parentHash);
+    const currentAggregate = this.aggregateValues.get(parentKeyHash);
     const newAggregate = this.config.add(currentAggregate, item);
-    this.aggregateValues.set(parentHash, newAggregate);
+    this.aggregateValues.set(parentKeyHash, newAggregate);
     
     // Emit modification event
-    const parentKey = parentPath[parentPath.length - 1];
-    const pathToParent = parentPath.slice(0, -1);
+    const parentKey = parentKeyPath[parentKeyPath.length - 1];
+    const keyPathToParent = parentKeyPath.slice(0, -1);
     
     this.modifiedHandlers.forEach(({ handler }) => {
-        handler(pathToParent, parentKey, this.propertyName, newAggregate);
+        handler(keyPathToParent, parentKey, this.propertyName, newAggregate);
     });
 }
 ```
@@ -798,48 +798,40 @@ private handleItemAdded(runtimePath: string[], itemKey: string, item: TItem): vo
 ### 4.7 Handling Item Removal
 
 ```typescript
-private handleItemRemoved(runtimePath: string[], itemKey: string): void {
-    const parentPath = getParentPath(runtimePath);
-    const parentHash = computePathHash(parentPath);
+private handleItemRemoved(keyPath: string[], itemKey: string, item: ImmutableProps): void {
+    const parentKeyPath = getParentKeyPath(keyPath);
+    const parentKeyHash = computeKeyPathHash(parentKeyPath);
     
-    // Lookup stored item data
-    const parentItems = this.itemsByParent.get(parentHash);
-    if (!parentItems) {
-        throw new Error(`No items tracked for parent ${parentHash}`);
-    }
-    
-    const item = parentItems.get(itemKey);
-    if (!item) {
-        throw new Error(`Item ${itemKey} not found in parent ${parentHash}`);
-    }
-    
-    // Remove from tracking
-    parentItems.delete(itemKey);
-    if (parentItems.size === 0) {
-        this.itemsByParent.delete(parentHash);
-    }
+    // Item is now passed directly - no lookup needed!
     
     // Compute new aggregate
-    const currentAggregate = this.aggregateValues.get(parentHash);
+    const currentAggregate = this.aggregateValues.get(parentKeyHash);
     if (currentAggregate === undefined) {
-        throw new Error(`No aggregate value for parent ${parentHash}`);
+        throw new Error(`No aggregate value for parent ${parentKeyHash}`);
     }
     
     const newAggregate = this.config.subtract(currentAggregate, item);
     
     // Update or remove aggregate based on whether items remain
-    if (parentItems?.size ?? 0 > 0) {
-        this.aggregateValues.set(parentHash, newAggregate);
+    const parentItems = this.itemsByParent.get(parentKeyHash);
+    if (parentItems) {
+        parentItems.delete(itemKey);
+        if (parentItems.size === 0) {
+            this.itemsByParent.delete(parentKeyHash);
+            this.aggregateValues.delete(parentKeyHash);
+        } else {
+            this.aggregateValues.set(parentKeyHash, newAggregate);
+        }
     } else {
-        this.aggregateValues.delete(parentHash);
+        this.aggregateValues.set(parentKeyHash, newAggregate);
     }
     
     // Emit modification event
-    const parentKey = parentPath[parentPath.length - 1];
-    const pathToParent = parentPath.slice(0, -1);
+    const parentKey = parentKeyPath[parentKeyPath.length - 1];
+    const keyPathToParent = parentKeyPath.slice(0, -1);
     
     this.modifiedHandlers.forEach(({ handler }) => {
-        handler(pathToParent, parentKey, this.propertyName, newAggregate);
+        handler(keyPathToParent, parentKey, this.propertyName, newAggregate);
     });
 }
 ```
@@ -891,7 +883,7 @@ src/
 
 | Decision | Rationale |
 |----------|-----------|
-| **Path as string array** | Matches existing `pathNames` pattern in pipeline architecture |
+| **Path segments as string array** | Matches existing `pathSegments` pattern in pipeline architecture |
 | **Separate add/subtract operators** | Enables efficient incremental updates without full recomputation |
 | **`undefined` initial aggregate** | Allows operators to distinguish first item from subsequent adds |
 | **State keyed by parent path hash** | Enables O(1) lookup of aggregate state |

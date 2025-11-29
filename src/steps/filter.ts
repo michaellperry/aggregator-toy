@@ -13,42 +13,42 @@ export class FilterStep<T> implements Step {
     constructor(
         private input: Step,
         private predicate: (item: T) => boolean,
-        private scopePath: string[]
+        private scopeSegments: string[]
     ) {}
 
     getTypeDescriptor(): TypeDescriptor {
         return this.input.getTypeDescriptor();
     }
 
-    onAdded(pathNames: string[], handler: AddedHandler): void {
-        if (this.isAtScopePath(pathNames)) {
-            this.input.onAdded(pathNames, (path, key, immutableProps) => {
+    onAdded(pathSegments: string[], handler: AddedHandler): void {
+        if (this.isAtScopeSegments(pathSegments)) {
+            this.input.onAdded(pathSegments, (keyPath, key, immutableProps) => {
                 if (this.predicate(immutableProps as T)) {
-                    handler(path, key, immutableProps);
+                    handler(keyPath, key, immutableProps);
                 }
             });
         } else {
-            this.input.onAdded(pathNames, handler);
+            this.input.onAdded(pathSegments, handler);
         }
     }
 
-    onRemoved(pathNames: string[], handler: RemovedHandler): void {
-        if (this.isAtScopePath(pathNames)) {
-            this.input.onRemoved(pathNames, (path, key, immutableProps) => {
+    onRemoved(pathSegments: string[], handler: RemovedHandler): void {
+        if (this.isAtScopeSegments(pathSegments)) {
+            this.input.onRemoved(pathSegments, (keyPath, key, immutableProps) => {
                 if (this.predicate(immutableProps as T)) {
-                    handler(path, key, immutableProps);
+                    handler(keyPath, key, immutableProps);
                 }
             });
         } else {
-            this.input.onRemoved(pathNames, handler);
+            this.input.onRemoved(pathSegments, handler);
         }
     }
 
-    onModified(pathNames: string[], handler: ModifiedHandler): void {
-        this.input.onModified(pathNames, handler);
+    onModified(pathSegments: string[], handler: ModifiedHandler): void {
+        this.input.onModified(pathSegments, handler);
     }
 
-    private isAtScopePath(pathNames: string[]): boolean {
-        return pathsMatch(pathNames, this.scopePath);
+    private isAtScopeSegments(pathSegments: string[]): boolean {
+        return pathsMatch(pathSegments, this.scopeSegments);
     }
 }

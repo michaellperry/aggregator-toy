@@ -7,43 +7,43 @@ export class DefinePropertyStep<T, K extends string, U> implements Step {
         private input: Step,
         private propertyName: K,
         private compute: (item: T) => U,
-        private scopePath: string[]
+        private scopeSegments: string[]
     ) {}
     
     getTypeDescriptor(): TypeDescriptor {
         return this.input.getTypeDescriptor();
     }
     
-    onAdded(pathNames: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
-        if (this.isAtScopePath(pathNames)) {
+    onAdded(pathSegments: string[], handler: (keyPath: string[], key: string, immutableProps: ImmutableProps) => void): void {
+        if (this.isAtScopeSegments(pathSegments)) {
             // Apply the property transformation at the scoped level
-            this.input.onAdded(pathNames, (path, key, immutableProps) => {
-                handler(path, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps as T) } as T & Record<K, U>);
+            this.input.onAdded(pathSegments, (keyPath, key, immutableProps) => {
+                handler(keyPath, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps as T) } as T & Record<K, U>);
             });
         } else {
-            // Pass through unchanged when not at scope path
-            this.input.onAdded(pathNames, handler);
+            // Pass through unchanged when not at scope segments
+            this.input.onAdded(pathSegments, handler);
         }
     }
     
-    onRemoved(pathNames: string[], handler: (path: string[], key: string, immutableProps: ImmutableProps) => void): void {
-        if (this.isAtScopePath(pathNames)) {
+    onRemoved(pathSegments: string[], handler: (keyPath: string[], key: string, immutableProps: ImmutableProps) => void): void {
+        if (this.isAtScopeSegments(pathSegments)) {
             // Apply the property transformation at the scoped level (for removal too)
-            this.input.onRemoved(pathNames, (path, key, immutableProps) => {
-                handler(path, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps as T) } as T & Record<K, U>);
+            this.input.onRemoved(pathSegments, (keyPath, key, immutableProps) => {
+                handler(keyPath, key, { ...immutableProps, [this.propertyName]: this.compute(immutableProps as T) } as T & Record<K, U>);
             });
         } else {
-            // Pass through unchanged when not at scope path
-            this.input.onRemoved(pathNames, handler);
+            // Pass through unchanged when not at scope segments
+            this.input.onRemoved(pathSegments, handler);
         }
     }
 
-    onModified(pathNames: string[], handler: (path: string[], key: string, name: string, value: any) => void): void {
-        this.input.onModified(pathNames, handler);
+    onModified(pathSegments: string[], handler: (keyPath: string[], key: string, name: string, value: any) => void): void {
+        this.input.onModified(pathSegments, handler);
     }
     
-    private isAtScopePath(pathNames: string[]): boolean {
-        return pathsMatch(pathNames, this.scopePath);
+    private isAtScopeSegments(pathSegments: string[]): boolean {
+        return pathsMatch(pathSegments, this.scopeSegments);
     }
 }
 
